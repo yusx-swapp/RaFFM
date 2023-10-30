@@ -104,7 +104,7 @@ Sixing Yu: <yusx@iastate.edu>
 
 - [x] ViT pre-trained ckpts
 - [x] ViT FL simulation scripts
-- [ ] Tensorboard logger
+- [x] Tensorboard logger
 - [ ] Evaluate Scripts for resource-aware models
 - [ ] BERT-large, FLAN-T5 ckpts
 - [ ] Simulation scripts on SQUAD, GLUE
