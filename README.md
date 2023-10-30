@@ -26,8 +26,9 @@ RaFFM enables **resource-aware foundation model deployments** in edge-FL based o
 ### Download Links
 We provide resource-aware Foundation model checkpoints trained via FL. You can download here:
 
-- [ViT-base Large checkpoints]() [Trained on *Large*  system heterogeneity setting]
-- [ViT-base Small checkpoints]() [Trained on *Small*  system heterogeneity setting]
+- [ViT-base Large CIFAR-10]() [Trained on *Large-budget*  system heterogeneity setting]
+- [ViT-base Small CIFAR-10](https://iowastate-my.sharepoint.com/:u:/g/personal/yusx_iastate_edu/EYVquHHGqFBLlwZpSrfVTUYBJDcOCvD3Cw2AWk3BdseWjQ?e=zBtyyM) [Trained on *Small-budget*  system heterogeneity setting]
+
 
 ### Checkpoints Usage
 ```bash
@@ -103,10 +104,13 @@ Sixing Yu: <yusx@iastate.edu>
 
 - [x] ViT pre-trained ckpts
 - [x] ViT FL simulation scripts
+- [ ] Tensorboard logger
+- [ ] Evaluate Scripts for resource-aware models
 - [ ] BERT-large, FLAN-T5 ckpts
 - [ ] Simulation scripts on SQUAD, GLUE
 - [ ] ViT CIFAR-100 ckpts
 - [ ] High level API for real edge-FL
+- [ ] ONNX and TensorRT APIs for edge
 - [ ] Elastic space APIs for system-heteo
 - [ ] Tiny fedlib 
 
@@ -115,7 +119,7 @@ Sixing Yu: <yusx@iastate.edu>
 If you find our work is helpful, please kindly support our efforts by citing our paper:
 
 ```
-@misc{yu2023bridging,
+@misc{yu2023raffm,
       title={Bridging the Gap Between Foundation Models and Heterogeneous Federated Learning}, 
       author={Sixing Yu and J. Pablo Muñoz and Ali Jannesari},
       year={2023},
