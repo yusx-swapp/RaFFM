@@ -2,11 +2,11 @@
 
 This is the official implementation for the paper: 
 
-Bridging the Gap Between Foundation Models and Heterogeneous Federated Learning ([paper](https://arxiv.org/pdf/2310.00247.pdf))
+*Bridging the Gap Between Foundation Models and Heterogeneous Federated Learning* ([**paper**](https://arxiv.org/pdf/2310.00247.pdf))
 
 ## Updates
 
-- [x] [10/30/2023] Scallable ViT Checkpoints released for heterogeneous resource edge-clients
+- [x] [10/30/2023] Scalable ViT Checkpoints released for heterogeneous resource edge-clients
 - [x] [10/30/2023] Demo scripts for train ViT on CIFAR-10/100 via heterogeneous resource FL
 
 
@@ -21,35 +21,35 @@ pip install -r requirements.txt
 
 ##  Scalable FMs Checkpoints
 
-RaFFM enables **resource-aware foundation model deployments** in edge-FL based on client local resources. That means, RaFFM can dynamically scaling down the size of FMs to heterogeneous resource local clients and enables efficient and fair local resource utilization.
+RaFFM enables **resource-aware foundation model deployments** in edge-FL based on client local resources. That means RaFFM can dynamically scale down the size of FMs to heterogeneous resource local clients and enables efficient and fair local resource utilization.
 
 ### Download Links
-We provide resource-aware Foundation model checkpoints trained via FL, you can here:
+We provide resource-aware Foundation model checkpoints trained via FL. You can download here:
 
 - [ViT-base Large checkpoints]() [Trained on *Large*  system heterogeneity setting]
 - [ViT-base Small checkpoints]() [Trained on *Small*  system heterogeneity setting]
 
-### Usage
+### Checkpoints Usage
 ```bash
 cd RaFFM
-
-RaFFM
-├── 
-|   ├── .gitignore
-|   ├── fl_vit.py
-|   ├── requirements.txt
-|   ├── ...
-├── raffm
-|   ├── ...
-
 ```
+<!-- # RaFFM
+# ├── 
+# |   ├── .gitignore
+# |   ├── fl_vit.py
+# |   ├── requirements.txt
+# |   ├── ...
+# ├── raffm
+# |   ├── ...
+
+``` -->
 
 
 ```python
 from transformers import ViTImageProcessor, ViTForImageClassification, TrainingArguments, Trainer
 from raffm import RaFFM
 
-# Generate resource aware models for cifar10
+# Generate resource-aware models for cifar10
 ckpt_path = "ckpt_folder_path" # the downloaded and unzipped ckpt folder path 
 
 model = ViTForImageClassification.from_pretrained(
@@ -67,7 +67,63 @@ print("subnetwork params",params)
 ```
 
 
-**Detailed instructions for generate reource-aware FMs can be find in [Demo](./fm_scaling.ipynb)**
+**Detailed instructions for generating resource-aware FMs can be found in [Demo](./fm_scaling.ipynb)**
 
 
 
+## Train FMs on Heterogeneous Resource edge-FL
+RaFFM is able to scale down a given FMs based on edge resource constraints, and hence, enabling resource-aware federated learning.
+
+Here we provide scripts to reproduce the experimental results we reported in paper.
+
+### Resource-aware ViT
+Train ViT on 100 clients edge-FL settings with 10% participate rate each communication round, simply run scripts:
+
+```bash
+python fl_vit.py --method raffm --spp --model vit --save_dir log/vit --dataset cifar10 --num_clients 100 --lr 3e-5
+```
+
+To check the results, you can:
+
+- Check the output information from terminal console
+- Use tensorboard: `tensorboard --logdir log/vit`
+
+**[Note]**: More APIs and scripts will post, please check the [**Updates**](#updates).
+
+## Training on Edge
+The above scripts is simulate on central device for reproducibility of RaFFM, if you want to deploy RaFFM on edge-FL:
+
+please see [EDGE-FL.md](TRAINING.md) for detailed training instructions.
+
+## Contact
+
+Sixing Yu: <yusx@iastate.edu>
+
+## TODO
+
+- [x] ViT pre-trained ckpts
+- [x] ViT FL simulation scripts
+- [ ] BERT-large, FLAN-T5 ckpts
+- [ ] Simulation scripts on SQUAD, GLUE
+- [ ] ViT CIFAR-100 ckpts
+- [ ] High level API for real edge-FL
+- [ ] Elastic space APIs for system-heteo
+- [ ] Tiny fedlib 
+
+## Citation
+
+If you find our work is helpful, please kindly support our efforts by citing our paper:
+
+```
+@misc{yu2023bridging,
+      title={Bridging the Gap Between Foundation Models and Heterogeneous Federated Learning}, 
+      author={Sixing Yu and J. Pablo Muñoz and Ali Jannesari},
+      year={2023},
+      eprint={2310.00247},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG}
+}
+```
+
+## Acknowledgement
+The experiments of this work is supported by **SHF CloudBank** and **Intel Labs ISL-cluster**.
