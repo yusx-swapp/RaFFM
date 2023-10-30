@@ -5,8 +5,7 @@ import numpy as np
 from datasets import load_dataset
 import functools
 import evaluate
-
-# import timm
+from torch.utils.tensorboard import SummaryWriter
 import copy
 import argparse
 from transformers import (
@@ -58,6 +57,7 @@ def federated_learning(
 ):
     early_stopping = EarlyStopping(patience=5, verbose=True)
 
+    writer = SummaryWriter(args.log_dir)
     best_acc = 0.0
     best_f1 = 0.0
 
@@ -102,6 +102,11 @@ def federated_learning(
             print(
                 f"Client {client_id} local model has {local_model_params} parameters out of {global_model.total_params} parameters in communication round {round}"
             )
+            writer.add_scalar(
+                str(client_id) + "/params",
+                local_model_params,
+                round,
+            )
             training_args = TrainingArguments(
                 output_dir=os.path.join(args.save_dir, "clients", str(client_id)),
                 per_device_train_batch_size=args.batch_size,
@@ -115,7 +120,7 @@ def federated_learning(
                 # save_total_limit=2,
                 remove_unused_columns=False,
                 push_to_hub=False,
-                report_to="tensorboard",
+                # report_to="tensorboard",
                 # load_best_model_at_end=True,
             )
 
@@ -132,8 +137,19 @@ def federated_learning(
 
             print(f"Eval local model {client_id}\n")
             metrics = trainer.evaluate(val_dataset)
+
             trainer.log_metrics("eval", metrics)
-            # trainer.save_metrics("eval", metrics)
+            val_accuracy, val_f1_score = metrics["eval_accuracy"], metrics["eval_f1"]
+            writer.add_scalar(
+                str(client_id) + "/eval_accuracy",
+                val_accuracy,
+                round,
+            )
+            writer.add_scalar(
+                str(client_id) + "/eval_f1",
+                val_f1_score,
+                round,
+            )
 
             local_model.to("cpu")
             local_models.append(local_model)
@@ -155,7 +171,7 @@ def federated_learning(
             # save_total_limit=2,
             remove_unused_columns=False,
             push_to_hub=False,
-            report_to="tensorboard",
+            # report_to="tensorboard",
             # load_best_model_at_end=True,
         )
 
@@ -173,6 +189,17 @@ def federated_learning(
         trainer.save_metrics("eval", metrics)
         val_accuracy, val_f1_score = metrics["eval_accuracy"], metrics["eval_f1"]
 
+        writer.add_scalar(
+            "global/eval_accuracy",
+            val_accuracy,
+            round,
+        )
+        writer.add_scalar(
+            "global/eval_f1",
+            val_f1_score,
+            round,
+        )
+
         global_model.model.to("cpu")
         if val_accuracy > best_acc:
             best_acc = val_accuracy
@@ -181,9 +208,18 @@ def federated_learning(
             )
         if val_f1_score > best_f1:
             best_f1 = val_f1_score
-
-        print(f"Validation Accuracy: {val_accuracy:.4f}")
-        print(f"Validation F1 Score: {val_f1_score:.4f}")
+        writer.add_scalar(
+            "global/best_accuracy",
+            best_acc,
+            round,
+        )
+        writer.add_scalar(
+            "global/best_f1",
+            best_f1,
+            round,
+        )
+        # print(f"Validation Accuracy: {val_accuracy:.4f}")
+        # print(f"Validation F1 Score: {val_f1_score:.4f}")
 
         print(f"Best Validation Accuracy: {best_acc:.4f}")
         print(f"Best Validation F1 Score: {best_f1:.4f}")
