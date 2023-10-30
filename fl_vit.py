@@ -57,7 +57,7 @@ def federated_learning(
 ):
     early_stopping = EarlyStopping(patience=5, verbose=True)
 
-    writer = SummaryWriter(args.log_dir)
+    writer = SummaryWriter(os.path.join(args.save_dir, args.dataset))
     best_acc = 0.0
     best_f1 = 0.0
 
@@ -260,8 +260,10 @@ def main(args):
 
     # load data and preprocess
     dataset = load_dataset(args.dataset)
-    train_val = dataset["train"].train_test_split(test_size=0.2)
+    if args.dataset == "cifar100":
+        dataset = dataset.rename_column("fine_label", "label")
 
+    train_val = dataset["train"].train_test_split(test_size=0.2)
     dataset["train"] = train_val["train"]
     dataset["validation"] = train_val["test"]
     labels = dataset["train"].features["label"].names
