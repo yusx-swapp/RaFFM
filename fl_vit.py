@@ -2,8 +2,9 @@ import os
 import time
 import torch
 import numpy as np
-from datasets import load_dataset, load_metric
+from datasets import load_dataset
 import functools
+import evaluate
 
 # import timm
 import copy
@@ -15,21 +16,21 @@ from transformers import (
     Trainer,
 )
 from raffm.utils import DatasetSplitter, step_lr, EarlyStopping
-import random
-
 from raffm import RaFFM
 
 
 @staticmethod
 def compute_metrics(p):
-    accuracy_metric = load_metric("accuracy")
-    f1_metric = load_metric("f1")
+    accuracy_metric = evaluate.load("accuracy")
+    f1_metric = evaluate.load("f1")
 
     accuracy = accuracy_metric.compute(
         predictions=np.argmax(p.predictions, axis=1), references=p.label_ids
     )
     f1 = f1_metric.compute(
-        predictions=np.argmax(p.predictions, axis=1), references=p.label_ids
+        predictions=np.argmax(p.predictions, axis=1),
+        references=p.label_ids,
+        average="weighted",
     )
 
     return {"accuracy": accuracy["accuracy"], "f1": f1["f1"]}
@@ -62,7 +63,7 @@ def federated_learning(
 
     for round in range(args.num_rounds):
         local_models = []
-        lr = step_lr(args.lr, round, 5, 0.98)
+        lr = step_lr(args.lr, round, args.step_size, 0.98)
 
         np.random.seed(int(time.time()))  # Set the seed to the current time
 
@@ -74,9 +75,8 @@ def federated_learning(
 
         if args.spp:
             global_model.salient_parameter_prioritization()
-
         avg_trainable_params = 0
-
+        processor = ViTImageProcessor.from_pretrained("google/vit-base-patch16-224")
         # Train the model on each client's dataset
         # for local_dataloader in local_dataloaders:
         for idx, client_id in enumerate(client_indices):
@@ -102,9 +102,8 @@ def federated_learning(
             print(
                 f"Client {client_id} local model has {local_model_params} parameters out of {global_model.total_params} parameters in communication round {round}"
             )
-
             training_args = TrainingArguments(
-                output_dir=os.path.join(args.save_dir, "clients", client_id),
+                output_dir=os.path.join(args.save_dir, "clients", str(client_id)),
                 per_device_train_batch_size=args.batch_size,
                 evaluation_strategy="no",
                 save_strategy="no",
@@ -127,7 +126,7 @@ def federated_learning(
                 compute_metrics=compute_metrics,
                 train_dataset=local_dataset,
                 eval_dataset=val_dataset,
-                # tokenizer=processor,
+                tokenizer=processor,
             )
             train_results = trainer.train()
 
@@ -142,6 +141,24 @@ def federated_learning(
 
         print(f"Eval global model in communication round {round}")
         global_model.aggregate(local_models)
+
+        training_args = TrainingArguments(
+            output_dir=os.path.join(args.save_dir, "global"),
+            per_device_train_batch_size=args.batch_size,
+            evaluation_strategy="no",
+            save_strategy="no",
+            num_train_epochs=args.num_local_epochs,
+            # save_steps=100,
+            # eval_steps=100,
+            # logging_steps=10,
+            learning_rate=lr,
+            # save_total_limit=2,
+            remove_unused_columns=False,
+            push_to_hub=False,
+            report_to="tensorboard",
+            # load_best_model_at_end=True,
+        )
+
         trainer = Trainer(
             model=global_model.model,
             args=training_args,
@@ -149,7 +166,7 @@ def federated_learning(
             compute_metrics=compute_metrics,
             train_dataset=local_dataset,
             eval_dataset=val_dataset,
-            # tokenizer=processor,
+            tokenizer=processor,
         )
         metrics = trainer.evaluate(val_dataset)
         trainer.log_metrics("eval", metrics)
@@ -218,13 +235,18 @@ def main(args):
         functools.partial(transform, processor=processor)
     )
 
-    splitter = DatasetSplitter(prepared_ds["train"], seed=123)
+    splitter = DatasetSplitter(dataset["train"], seed=123)
 
     local_datasets = splitter.split(args.num_clients, replacement=False)
 
+    for i, local_data in enumerate(local_datasets):
+        local_datasets[i] = local_data.with_transform(
+            functools.partial(transform, processor=processor)
+        )
+
     # load/initialize global model and convert to raffm model
-    if args.ckpt:
-        ckpt_path = args.ckpt
+    if args.resume_ckpt:
+        ckpt_path = args.resume_ckpt
     else:
         ckpt_path = model_name
 
@@ -233,12 +255,12 @@ def main(args):
         num_labels=len(labels),
         id2label={str(i): c for i, c in enumerate(labels)},
         label2id={c: str(i) for i, c in enumerate(labels)},
+        ignore_mismatched_sizes=True,
     )
 
     global_model = RaFFM(model.to("cpu"))
-
     global_model = federated_learning(
-        args, model, local_datasets, prepared_ds["validation"], device="cuda"
+        args, global_model, local_datasets, prepared_ds["validation"]
     )
     global_model.model.save_pretrained(
         os.path.join(args.save_dir, args.dataset, "final")
@@ -271,7 +293,7 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--ckpt",
+        "--resume_ckpt",
         type=str,
         default=None,
         help="dir save the model",
@@ -283,15 +305,15 @@ if __name__ == "__main__":
         choices=["cifar100", "flowers102", "Caltech101", "cifar10", "Food101"],
         help="Dataset to use (currently only cifar100 is supported)",
     )
-    parser.add_argument(
-        "--k_shot",
-        type=int,
-        default=50,
-        help="Number of samples per class for few-shot learning",
-    )
-    parser.add_argument(
-        "--num_epochs", type=int, default=10, help="Number of training epochs"
-    )
+    # parser.add_argument(
+    #     "--k_shot",
+    #     type=int,
+    #     default=50,
+    #     help="Number of samples per class for few-shot learning",
+    # )
+    # parser.add_argument(
+    #     "--num_epochs", type=int, default=10, help="Number of training epochs"
+    # )
     parser.add_argument(
         "--num_clients",
         type=int,
@@ -304,7 +326,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--step_size",
         type=int,
-        default=10,
+        default=5,
         help="Step size for the learning rate scheduler",
     )
     parser.add_argument(
