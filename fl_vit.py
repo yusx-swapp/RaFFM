@@ -1,240 +1,77 @@
 import os
 import time
 import torch
-import torch.nn as nn
-import torch.optim as optim
 import numpy as np
-from torch.utils.data import DataLoader, random_split, Dataset
-from torchvision import datasets, transforms, models
-from torch.optim.lr_scheduler import ExponentialLR
-from torch.utils.data import Subset
+from datasets import load_dataset, load_metric
+import functools
 
 # import timm
 import copy
 import argparse
-from sklearn.metrics import f1_score
-from transformers import ViTForImageClassification
-from utils import (
-    step_lr,
-    EarlyStopping,
+from transformers import (
+    ViTForImageClassification,
+    ViTImageProcessor,
+    TrainingArguments,
+    Trainer,
 )
+from raffm.utils import DatasetSplitter, step_lr, EarlyStopping
 import random
 
 from raffm import RaFFM
 
 
-class DatasetSplitter:
-    def __init__(self, dataset, seed=None):
-        self.dataset = dataset
-        if seed is not None:
-            random.seed(seed)
+@staticmethod
+def compute_metrics(p):
+    accuracy_metric = load_metric("accuracy")
+    f1_metric = load_metric("f1")
 
-    def split(self, n, replacement=False):
-        if replacement:
-            return self._split_with_replacement(n)
-        else:
-            return self._split_without_replacement(n)
+    accuracy = accuracy_metric.compute(
+        predictions=np.argmax(p.predictions, axis=1), references=p.label_ids
+    )
+    f1 = f1_metric.compute(
+        predictions=np.argmax(p.predictions, axis=1), references=p.label_ids
+    )
 
-    def _split_with_replacement(self, n):
-        size = len(self.dataset) // n
-        sub_datasets = []
-        for _ in range(n):
-            indices = random.choices(range(len(self.dataset)), k=size)
-            sub_dataset = Subset(self.dataset, indices)
-            sub_datasets.append(sub_dataset)
-        return sub_datasets
-
-    def _split_without_replacement(self, n):
-        indices = list(range(len(self.dataset)))
-        random.shuffle(indices)
-        size = len(indices) // n
-        sub_datasets = [indices[i * size : (i + 1) * size] for i in range(n)]
-        sub_datasets[-1].extend(indices[n * size :])
-
-        client_datasets = [Subset(self.dataset, indices) for indices in sub_datasets]
-
-        return client_datasets
-
-
-def eval(model, val_dataloader, device):
-    model.to(device)
-    model.eval()
-
-    correct_val = 0
-    all_preds, all_labels = [], []
-
-    for inputs, labels in val_dataloader:
-        inputs, labels = inputs.to(device), labels.to(device)
-
-        with torch.no_grad():
-            outputs = model(inputs).logits
-            preds = outputs.argmax(-1)
-            correct_val += torch.sum(preds == labels.data)
-            all_preds.extend(preds.cpu().numpy())
-            all_labels.extend(labels.cpu().numpy())
-
-    val_accuracy = correct_val.double() / len(val_dataloader.dataset)
-    val_f1_score = f1_score(all_labels, all_preds, average="weighted")
-    return val_accuracy, val_f1_score
-
-
-# class Subset(Dataset):
-#     def __init__(self, dataset, indices):
-#         self.dataset = dataset
-#         self.indices = indices
-
-#     def __getitem__(self, idx):
-#         image, label = self.dataset[self.indices[idx]]
-#         return image, label
-
-#     def __len__(self):
-#         return len(self.indices)
-
-
-def get_k_shot_indices(dataset, k, num_classes, num_clients, replace=False):
-    class_examples = [[] for _ in range(num_classes)]
-
-    for idx, (_, label) in enumerate(dataset):
-        class_examples[label].append(idx)
-
-    client_indices = []
-    for _ in range(num_clients):
-        indices = []
-        for class_idx in range(num_classes):
-            indices += np.random.choice(
-                class_examples[class_idx], k, replace=replace
-            ).tolist()
-        client_indices.append(indices)
-
-    return client_indices
-
-
-def set_parameter_requires_grad(model, feature_extracting, model_name):
-    if feature_extracting:
-        for param in model.parameters():
-            param.requires_grad = False
-
-        if model_name == "resnet":
-            for param in model.fc.parameters():
-                param.requires_grad = True
-        elif model_name == "vit":
-            for param in model.head.parameters():
-                param.requires_grad = True
+    return {"accuracy": accuracy["accuracy"], "f1": f1["f1"]}
 
 
 def initialize_model(model_name, num_classes, feature_extract, use_pretrained=True):
-    if model_name == "resnet":
-        model_ft = models.resnet50(pretrained=use_pretrained)
-        num_ftrs = model_ft.fc.in_features
-        model_ft.fc = nn.Linear(num_ftrs, num_classes)
-        # set_parameter_requires_grad(model_ft, feature_extract, model_name)
-
-    elif model_name == "vit":
-        # model_ft = timm.create_model("vit_base_patch16_224", pretrained=use_pretrained, num_classes=num_classes)
+    if model_name == "vit":
         model_ft = ViTForImageClassification.from_pretrained(
             "google/vit-base-patch16-224",
             num_labels=num_classes,
             ignore_mismatched_sizes=True,
         )
-
-        # set_parameter_requires_grad(model_ft, feature_extract, model_name)
     elif model_name == "vit-large":
         model_ft = ViTForImageClassification.from_pretrained(
             "google/vit-large-patch16-224-in21k",
             num_labels=num_classes,
             ignore_mismatched_sizes=True,
         )
-        # model_ft = timm.create_model("vit_large_patch16_224", pretrained=use_pretrained, num_classes=num_classes)
-
-        # set_parameter_requires_grad(model_ft, feature_extract, model_name)
 
     return model_ft
 
 
-def load_data(dataset_name, k_shot, transform, num_clients):
-    if dataset_name == "cifar100":
-        train_dataset = datasets.CIFAR100(
-            root="./data", train=True, download=True, transform=transform
-        )
-        val_dataset = datasets.CIFAR100(
-            root="./data", train=False, download=True, transform=transform
-        )
-        num_classes = 100
-
-    elif dataset_name == "cifar10":
-        train_dataset = datasets.CIFAR10(
-            root="./data", train=True, download=True, transform=transform
-        )
-        val_dataset = datasets.CIFAR10(
-            root="./data", train=False, download=True, transform=transform
-        )
-        num_classes = 10
-
-    elif dataset_name == "flowers102":
-        train_dataset = datasets.Flowers102(
-            root="./data", split="train", download=True, transform=transform
-        )
-        num_classes = 102
-        val_dataset = datasets.Flowers102(
-            root="./data", split="test", download=True, transform=transform
-        )
-
-    elif dataset_name == "Caltech101":
-        transform = transforms.Compose(
-            [
-                transforms.Resize((224, 224)),
-                transforms.Grayscale(num_output_channels=1),
-                transforms.ToTensor(),
-                transforms.Normalize((0.5), (0.5)),
-            ]
-        )
-
-        dataset = datasets.Caltech101(root="./data", download=True, transform=transform)
-
-        train_dataset, val_dataset = random_split(
-            dataset, [int(0.8 * len(dataset)), len(dataset) - int(0.8 * len(dataset))]
-        )
-        num_classes = 101
-
-    elif dataset_name == "Food101":
-        train_dataset = datasets.Food101(
-            root="./data", split="train", download=True, transform=transform
-        )
-        num_classes = 101
-        val_dataset = datasets.Food101(
-            root="./data", split="test", download=True, transform=transform
-        )
-
-    # replace = False
-    # if dataset_name == "flowers102":
-    #     replace = True
-
-    # indices = get_k_shot_indices(
-    #     train_dataset, k_shot, num_classes, num_clients, replace=replace
-    # )
-    # client_datasets = [Subset(train_dataset, indices) for indices in indices]
-
-    return train_dataset, val_dataset, num_classes
-
-
 def federated_learning(
-    args, model, local_dataloaders, val_dataloader, criterion, device="cuda"
+    args, global_model: RaFFM, local_datasets, val_dataset, test_dataset=None
 ):
     early_stopping = EarlyStopping(patience=5, verbose=True)
 
-    global_model = RaFFM(model.to("cpu"))
     best_acc = 0.0
     best_f1 = 0.0
+
     for round in range(args.num_rounds):
         local_models = []
         lr = step_lr(args.lr, round, 5, 0.98)
 
         np.random.seed(int(time.time()))  # Set the seed to the current time
+
         client_indices = np.random.choice(
-            len(local_dataloaders),
-            size=int(0.1 * len(local_dataloaders)),
+            len(local_datasets),
+            size=int(0.1 * len(local_datasets)),
             replace=False,
         )
+
         if args.spp:
             global_model.salient_parameter_prioritization()
 
@@ -243,7 +80,7 @@ def federated_learning(
         # Train the model on each client's dataset
         # for local_dataloader in local_dataloaders:
         for idx, client_id in enumerate(client_indices):
-            local_dataloader = local_dataloaders[client_id]
+            local_dataset = local_datasets[client_id]
             print(f"Training client {client_id} in communication round {round}")
 
             if args.method == "raffm":
@@ -266,32 +103,58 @@ def federated_learning(
                 f"Client {client_id} local model has {local_model_params} parameters out of {global_model.total_params} parameters in communication round {round}"
             )
 
-            local_model = local_model.to(device)
-            # local_model = nn.DataParallel(local_model)
-            local_optimizer = optim.Adam(local_model.parameters(), lr=lr)
-            lr_scheduler = ExponentialLR(local_optimizer, gamma=0.95)
-            # Fine-tune the local model on the client's dataset
-            for epoch in range(args.num_local_epochs):
-                local_model.train()
-                for inputs, labels in local_dataloader:
-                    inputs, labels = inputs.to(device), labels.to(device)
-                    local_optimizer.zero_grad()
-                    loss = local_model(inputs, labels=labels).loss
-                    loss.backward()
-                    local_optimizer.step()
-                lr_scheduler.step()
+            training_args = TrainingArguments(
+                output_dir=os.path.join(args.save_dir, "clients", client_id),
+                per_device_train_batch_size=args.batch_size,
+                evaluation_strategy="no",
+                save_strategy="no",
+                num_train_epochs=args.num_local_epochs,
+                # save_steps=100,
+                # eval_steps=100,
+                # logging_steps=10,
+                learning_rate=lr,
+                # save_total_limit=2,
+                remove_unused_columns=False,
+                push_to_hub=False,
+                report_to="tensorboard",
+                # load_best_model_at_end=True,
+            )
 
-            print("Eval local model\n")
-            val_accuracy, val_f1_score = eval(local_model, val_dataloader, device)
-            print(f"Local Validation Accuracy: {val_accuracy:.4f}")
-            print(f"Local Validation F1 Score: {val_f1_score:.4f}")
+            trainer = Trainer(
+                model=local_model,
+                args=training_args,
+                data_collator=collate_fn,
+                compute_metrics=compute_metrics,
+                train_dataset=local_dataset,
+                eval_dataset=val_dataset,
+                # tokenizer=processor,
+            )
+            train_results = trainer.train()
+
+            print(f"Eval local model {client_id}\n")
+            metrics = trainer.evaluate(val_dataset)
+            trainer.log_metrics("eval", metrics)
+            # trainer.save_metrics("eval", metrics)
 
             local_model.to("cpu")
             local_models.append(local_model)
             print("Training finished!")
-        print("Eval global model finished!")
+
+        print(f"Eval global model in communication round {round}")
         global_model.aggregate(local_models)
-        val_accuracy, val_f1_score = eval(global_model.model, val_dataloader, device)
+        trainer = Trainer(
+            model=global_model.model,
+            args=training_args,
+            data_collator=collate_fn,
+            compute_metrics=compute_metrics,
+            train_dataset=local_dataset,
+            eval_dataset=val_dataset,
+            # tokenizer=processor,
+        )
+        metrics = trainer.evaluate(val_dataset)
+        trainer.log_metrics("eval", metrics)
+        trainer.save_metrics("eval", metrics)
+        val_accuracy, val_f1_score = metrics["eval_accuracy"], metrics["eval_f1"]
 
         global_model.model.to("cpu")
         if val_accuracy > best_acc:
@@ -307,6 +170,12 @@ def federated_learning(
 
         print(f"Best Validation Accuracy: {best_acc:.4f}")
         print(f"Best Validation F1 Score: {best_f1:.4f}")
+
+        if test_dataset:
+            metrics = trainer.evaluate(test_dataset, metric_key_prefix="test")
+            trainer.log_metrics("eval", metrics)
+            trainer.save_metrics("eval", metrics)
+
         early_stopping(val_f1_score)
         if early_stopping.has_converged():
             print("Model has converged. Stopping training.")
@@ -314,47 +183,62 @@ def federated_learning(
     return global_model
 
 
+def collate_fn(batch):
+    return {
+        "pixel_values": torch.stack([x["pixel_values"] for x in batch]),
+        "labels": torch.tensor([x["labels"] for x in batch]),
+    }
+
+
+def transform(example_batch, processor):
+    # Take a list of PIL images and turn them to pixel values
+    inputs = processor([x for x in example_batch["img"]], return_tensors="pt")
+
+    # Don't forget to include the labels!
+    inputs["labels"] = example_batch["label"]
+    return inputs
+
+
 def main(args):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if args.model == "vit":
+        model_name = "google/vit-base-patch16-224"
+    elif args.model == "vit-large":
+        model_name = "google/vit-large-patch16-224-in21k"
 
-    # transform = transforms.Compose([transforms.Resize((224, 224)), transforms.ToTensor()])
-    # define imagenet transforms
-    transform = transforms.Compose(
-        [
-            transforms.Resize((224, 224)),
-            transforms.ToTensor(),
-            transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
-        ]
+    # load data and preprocess
+    dataset = load_dataset(args.dataset)
+    train_val = dataset["train"].train_test_split(test_size=0.2)
+
+    dataset["train"] = train_val["train"]
+    dataset["validation"] = train_val["test"]
+    labels = dataset["train"].features["label"].names
+
+    processor = ViTImageProcessor.from_pretrained(model_name)
+    prepared_ds = dataset.with_transform(
+        functools.partial(transform, processor=processor)
     )
 
-    if args.method == "centralized":
-        args.num_clients = 1
-
-    train_dataset, val_dataset, num_classes = load_data(
-        args.dataset, args.k_shot, transform, args.num_clients
-    )
-    splitter = DatasetSplitter(train_dataset, seed=123)
+    splitter = DatasetSplitter(prepared_ds["train"], seed=123)
 
     local_datasets = splitter.split(args.num_clients, replacement=False)
 
-    train_dataloaders = [
-        DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
-        for train_dataset in local_datasets
-    ]
-    val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
-
-    # Load the pretrained ResNet-50 model
-    model = initialize_model(args.model, num_classes, True, use_pretrained=True)
-    model = model.to(device)
+    # load/initialize global model and convert to raffm model
     if args.ckpt:
-        model.from_pretrained(args.ckpt)
-    # model = nn.DataParallel(model)
+        ckpt_path = args.ckpt
+    else:
+        ckpt_path = model_name
 
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=5e-5)
+    model = ViTForImageClassification.from_pretrained(
+        ckpt_path,
+        num_labels=len(labels),
+        id2label={str(i): c for i, c in enumerate(labels)},
+        label2id={c: str(i) for i, c in enumerate(labels)},
+    )
+
+    global_model = RaFFM(model.to("cpu"))
 
     global_model = federated_learning(
-        args, model, train_dataloaders, val_dataloader, criterion, device="cuda"
+        args, model, local_datasets, prepared_ds["validation"], device="cuda"
     )
     global_model.model.save_pretrained(
         os.path.join(args.save_dir, args.dataset, "final")
@@ -438,24 +322,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--spp", action="store_true", help="salient parameter prioritization"
     )
-    parser.add_argument("--batch_size", type=int, default=64)
-
+    parser.add_argument(
+        "--batch_size", type=int, help="per device batch size", default=64
+    )
     args = parser.parse_args()
     main(args)
-
-
-# python fl_vit.py --method raffm --spp --model vit --dataset cifar10 --k_shot 12 --num_epochs 100 --lr 3e-5 > raffm_cifar10_vit_new.txt
-# python fl_vit.py --method raffm --spp --batch_size 48 --model vit --dataset cifar100 --k_shot 12 --num_epochs 100 --lr 3e-5 > raffm_cifar100_vit_new.txt
-# python fl_vit.py --method raffm --spp --model vit --dataset flowers102 --k_shot 12 --num_epochs 100 --lr 3e-5 > raffm_flowers102_vit_new.txt
-
-# python fl_cv.py --batch_size 16 --method raffm --spp --model vit-large --dataset cifar10 --k_shot 12 --num_epochs 100 --lr 3e-5 > raffm_cifar10_vit-large.txt
-# python fl_cv.py --method raffm --spp --model vit-large --dataset cifar100 --k_shot 12 --num_epochs 100 --lr 3e-5 > raffm_cifar100_vit-large.txt
-# python fl_cv.py --method raffm --spp --model vit-large --dataset flowers102 --k_shot 12 --num_epochs 100 --lr 3e-5 > raffm_flowers102_vit-large.txt
-
-# python fl_cv.py --batch_size 128 --method vanilla --model vit --dataset cifar10 --k_shot 12 --num_epochs 100 --lr 3e-5 > baseline_cifar10_vit.txt
-# python fl_cv.py --batch_size 128 --method vanilla --model vit --dataset cifar100 --k_shot 12 --num_epochs 100 --lr 3e-5 > baseline_cifar100_vit.txt
-# python fl_cv.py --batch_size 128 --method vanilla --model vit --dataset flowers102 --k_shot 12 --num_epochs 100 --lr 3e-5 > baseline_flowers102_vit.txt
-
-# python fl_cv.py --method vanilla --model vit-large --dataset cifar10 --k_shot 12 --num_epochs 100 --lr 3e-5 > baseline_cifar10_vit-large.txt
-# python fl_cv.py --method vanilla --model vit-large --dataset cifar100 --k_shot 12 --num_epochs 100 --lr 3e-5 > baseline_cifar100_vit-large.txt
-# python fl_cv.py --method vanilla --model vit-large --dataset flowers102 --k_shot 12 --num_epochs 100 --lr 3e-5 > baseline_flowers102_vit-large.txt

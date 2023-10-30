@@ -20,3 +20,5 @@ data/
 *logs/
 **.ini
 *.test/
+ckpt/
+/log
