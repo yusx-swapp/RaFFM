@@ -88,10 +88,11 @@ class DatasetSplitter:
     def split(self, n, replacement=False):
         if replacement:
             return self._split_with_replacement(n)
-        else:
-            return self._split_without_replacement(n)
+        return self._split_without_replacement(n)
 
-    def k_shot(self, n, k_shot=12):
+    def k_shot(self, n, k_shot=12, replacement=False):
+        if replacement:
+            return self._split_k_shot_with_replacement(n, k_shot)
         return self._split_k_shot(n, k_shot)
 
     def _split_with_replacement(self, n):
@@ -116,77 +117,54 @@ class DatasetSplitter:
         return sub_datasets
 
     def _split_k_shot(self, n, k_shot):
-        rng = random.Random(self.seed)
-        labels = self.dataset.features["label"].names
-        sub_datasets = []
-        for _ in range(n):
-            sub_dataset = {label: [] for label in labels}
-            for label in labels:
-                # Filter the data by label
-                label_data = self.dataset.filter(
-                    lambda example: example["label"] == label
-                )
-                # Sample k_shot examples from the filtered data
-                sampled_examples = rng.sample(label_data, k_shot)
-                sub_dataset[label].extend(sampled_examples)
-            sub_datasets.append(Dataset.from_dict(sub_dataset))
+        # Step 1: Group the dataset by class
+        class_groups = {}
+        for i in range(len(self.dataset)):
+            label = self.dataset[i]["label"]
+            if label not in class_groups:
+                class_groups[label] = []
+            class_groups[label].append(i)
 
+        # Check if each class has enough samples
+        for label, indices in class_groups.items():
+            if len(indices) < n * k_shot:
+                raise ValueError(
+                    f"Not enough samples in class {label} for a {k_shot}-shot split into {n} parts"
+                )
+
+        # Step 2 & 3: For each class, select n * k samples and split them
+        sub_datasets_indices = [[] for _ in range(n)]
+        for label, indices in class_groups.items():
+            selected_indices = random.sample(indices, n * k_shot)
+            for i in range(n):
+                sub_datasets_indices[i].extend(
+                    selected_indices[i * k_shot : (i + 1) * k_shot]
+                )
+
+        # Step 4: Combine the corresponding sub-datasets from all classes
+        sub_datasets = [
+            Dataset.from_dict(self.dataset[indices]) for indices in sub_datasets_indices
+        ]
         return sub_datasets
 
-    def get_k_shot_indice_vit(dataset, k, num_classes, num_clients, replace=False):
-        class_examples = [[] for _ in range(num_classes)]
+    def _split_k_shot_with_replacement(self, n, k_shot):
+        # Step 1: Group the dataset by class
+        class_groups = {}
+        for i in range(len(self.dataset)):
+            label = self.dataset[i]["label"]
+            if label not in class_groups:
+                class_groups[label] = []
+            class_groups[label].append(i)
 
-        for idx, (_, label) in enumerate(dataset):
-            class_examples[label].append(idx)
+        # Step 2: For each class, select n * k samples with replacement and split them
+        sub_datasets_indices = [[] for _ in range(n)]
+        for label, indices in class_groups.items():
+            for i in range(n):
+                selected_indices = random.choices(indices, k=k_shot)
+                sub_datasets_indices[i].extend(selected_indices)
 
-        client_indices = []
-        for _ in range(num_clients):
-            indices = []
-            for class_idx in range(num_classes):
-                indices += np.random.choice(
-                    class_examples[class_idx], k, replace=replace
-                ).tolist()
-            client_indices.append(indices)
-
-        return client_indices
-
-
-def k_shot_data(dataset, num_clients, k_shot, dataset_name):
-    datasets = []
-
-    if dataset_name in ["sst2", "mrpc", "qnli", "mnli", "qqp", "rte", "cola"]:
-        class_examples = []
-        num_classes = 3 if dataset_name == "mnli" else 2
-
-        for i in range(num_classes):
-            class_examples.append(
-                dataset.filter(lambda example: example["label"] == i).shuffle()
-            )
-
-        examples_per_client = k_shot * num_classes
-
-        for i in range(num_clients):
-            subsets = []
-
-            for j in range(num_classes):
-                start = i * k_shot
-                end = (i + 1) * k_shot
-                subsets.append(class_examples[j].select(range(start, end)))
-
-            client_dataset = concatenate_datasets(subsets)
-            datasets.append(client_dataset)
-
-    elif dataset_name == "stsb":
-        dataset = dataset.shuffle()
-        examples_per_client = (
-            k_shot * 2
-        )  # Assuming an equal number of examples for high and low scores
-
-        for i in range(num_clients):
-            start = i * examples_per_client
-            end = (i + 1) * examples_per_client
-
-            client_dataset = dataset.select(range(start, end))
-            datasets.append(client_dataset)
-
-    return datasets
+        # Step 3: Combine the corresponding sub-datasets from all classes
+        sub_datasets = [
+            Dataset.from_dict(self.dataset[indices]) for indices in sub_datasets_indices
+        ]
+        return sub_datasets

@@ -264,7 +264,9 @@ def main(args):
     if args.dataset == "cifar100":
         dataset = dataset.rename_column("fine_label", "label")
 
-    train_val = dataset["train"].train_test_split(test_size=0.2)
+    train_val = dataset["train"].train_test_split(
+        test_size=0.2, stratify_by_column="label"
+    )
     dataset["train"] = train_val["train"]
     dataset["validation"] = train_val["test"]
     labels = dataset["train"].features["label"].names
