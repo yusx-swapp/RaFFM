@@ -85,10 +85,13 @@ class DatasetSplitter:
         if seed is not None:
             random.seed(seed)
 
-    def split(self, n, replacement=False):
-        if replacement:
-            return self._split_with_replacement(n)
-        return self._split_without_replacement(n)
+    def split(self, n, k_shot=None, replacement=False):
+        if k_shot:
+            return self.k_shot(n, k_shot, replacement)
+        else:
+            if replacement:
+                return self._split_with_replacement(n)
+            return self._split_without_replacement(n)
 
     def k_shot(self, n, k_shot=12, replacement=False):
         if replacement:

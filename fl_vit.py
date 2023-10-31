@@ -219,8 +219,6 @@ def federated_learning(
             best_f1,
             round,
         )
-        # print(f"Validation Accuracy: {val_accuracy:.4f}")
-        # print(f"Validation F1 Score: {val_f1_score:.4f}")
 
         print(f"Best Validation Accuracy: {best_acc:.4f}")
         print(f"Best Validation F1 Score: {best_f1:.4f}")
@@ -278,7 +276,9 @@ def main(args):
 
     splitter = DatasetSplitter(dataset["train"], seed=123)
 
-    local_datasets = splitter.split(args.num_clients, replacement=False)
+    local_datasets = splitter.split(
+        args.num_clients, k_shot=args.k_shot, replacement=False
+    )
 
     for i, local_data in enumerate(local_datasets):
         local_datasets[i] = local_data.with_transform(
@@ -346,15 +346,12 @@ if __name__ == "__main__":
         choices=["cifar100", "flowers102", "Caltech101", "cifar10", "Food101"],
         help="Dataset to use (currently only cifar100 is supported)",
     )
-    # parser.add_argument(
-    #     "--k_shot",
-    #     type=int,
-    #     default=50,
-    #     help="Number of samples per class for few-shot learning",
-    # )
-    # parser.add_argument(
-    #     "--num_epochs", type=int, default=10, help="Number of training epochs"
-    # )
+    parser.add_argument(
+        "--k-shot",
+        type=int,
+        default=None,
+        help="split k-shot local data",
+    )
     parser.add_argument(
         "--num_clients",
         type=int,
