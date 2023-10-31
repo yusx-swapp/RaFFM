@@ -1,4 +1,3 @@
-import random
 import numpy as np
 import copy
 from torch import nn
@@ -49,7 +48,6 @@ def arc_config_sampler(
     """
     arc_config = {}
     np.random.seed(int(time.time()))  # Set the seed to the current time
-
     for layer in range(n_layer):
         if layer == 0:
             pre_hidden = embedding_size
@@ -59,10 +57,10 @@ def arc_config_sampler(
         if layer == n_layer - 1:
             out_hidden = model_out_hidden
         else:
-            out_hidden = random.choice(out_hidden_space)
+            out_hidden = np.random.choice(out_hidden_space)
 
-        inter_hidden = random.choice(inter_hidden_space)
-        atten_out = random.choice(atten_out_space)
+        inter_hidden = np.random.choice(inter_hidden_space)
+        atten_out = np.random.choice(atten_out_space)
 
         arc_config[f"layer_{layer + 1}"] = {
             "atten_out": atten_out,
@@ -124,7 +122,6 @@ def bert_module_handler(model, arc_config):
                 config.hidden_size, eps=config.layer_norm_eps
             )
 
-    random.seed(time.time())
     subnetwork = copy.deepcopy(model).cpu()
 
     bert_layers = subnetwork.bert.encoder.layer
@@ -206,7 +203,6 @@ def vit_module_handler(model, arc_config):
             super().__init__(config)
             self.dense = nn.Linear(config.intermediate_size, config.hidden_size)
 
-    random.seed(time.time())
     subnetwork = copy.deepcopy(model).cpu()
 
     bert_layers = subnetwork.vit.encoder.layer
