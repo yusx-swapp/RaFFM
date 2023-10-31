@@ -8,6 +8,7 @@ This is the official implementation for the paper:
 
 - [x] [10/30/2023] Scalable ViT Checkpoints released for heterogeneous resource edge-clients
 - [x] [10/30/2023] Demo scripts for train ViT on CIFAR-10/100 via heterogeneous resource FL
+- [x] [10/31/2023] Pushed elastic space APIs for system-heteo
 
 
 ## Installation
@@ -105,13 +106,13 @@ Sixing Yu: <yusx@iastate.edu>
 - [x] ViT pre-trained ckpts
 - [x] ViT FL simulation scripts
 - [x] Tensorboard logger
+- [x] Elastic space APIs for system-heteo
 - [ ] Evaluate Scripts for resource-aware models
 - [ ] BERT-large, FLAN-T5 ckpts
 - [ ] Simulation scripts on SQUAD, GLUE
 - [ ] ViT CIFAR-100 ckpts
 - [ ] High level API for real edge-FL
 - [ ] ONNX and TensorRT APIs for edge
-- [ ] Elastic space APIs for system-heteo
 - [ ] Tiny fedlib 
 
 ## Citation
