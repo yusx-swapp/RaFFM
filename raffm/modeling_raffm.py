@@ -15,6 +15,7 @@ class RaFFM:
     def __init__(self, model, elastic_config=None) -> None:
         self.model = model
         self.total_params = calculate_params(model=model)
+
         if not elastic_config:
             # set defalt search space configuration (this is defalt setting for bert)
             elastic_config = {
@@ -26,7 +27,9 @@ class RaFFM:
             print(
                 f"[Warning]: No elastic configuration provides. Set to the defalt elastic space {elastic_config}."
             )
-
+        elif isinstance(elastic_config, str):
+            elastic_config = torch.load(elastic_config)
+        assert isinstance(elastic_config, dict), "Invalid elastic_config"
         self.elastic_config = elastic_config
 
     def random_resource_aware_model(self):
@@ -79,8 +82,8 @@ class RaFFM:
 
     def save_ckpt(self, dir):
         self.model.save_pretrained(os.path.join(dir))
-        torch.save(self.elastic_config, os.path.join(dir, "elastic.json"))
+        torch.save(self.elastic_config, os.path.join(dir, "elastic.pt"))
 
     def load_ckpt(self, dir):
         self.model.from_pretrained(dir)
-        self.elastic_config = torch.load(os.path.join(dir, "elastic.json"))
+        self.elastic_config = torch.load(os.path.join(dir, "elastic.pt"))
