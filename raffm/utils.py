@@ -91,6 +91,9 @@ class DatasetSplitter:
         else:
             return self._split_without_replacement(n)
 
+    def k_shot(self, n, k_shot=12):
+        return self._split_k_shot(n, k_shot)
+
     def _split_with_replacement(self, n):
         size = len(self.dataset) // n
         sub_datasets = []
@@ -112,23 +115,40 @@ class DatasetSplitter:
 
         return sub_datasets
 
+    def _split_k_shot(self, n, k_shot):
+        rng = random.Random(self.seed)
+        labels = self.dataset.features["label"].names
+        sub_datasets = []
+        for _ in range(n):
+            sub_dataset = {label: [] for label in labels}
+            for label in labels:
+                # Filter the data by label
+                label_data = self.dataset.filter(
+                    lambda example: example["label"] == label
+                )
+                # Sample k_shot examples from the filtered data
+                sampled_examples = rng.sample(label_data, k_shot)
+                sub_dataset[label].extend(sampled_examples)
+            sub_datasets.append(Dataset.from_dict(sub_dataset))
 
-def get_k_shot_indice_vit(dataset, k, num_classes, num_clients, replace=False):
-    class_examples = [[] for _ in range(num_classes)]
+        return sub_datasets
 
-    for idx, (_, label) in enumerate(dataset):
-        class_examples[label].append(idx)
+    def get_k_shot_indice_vit(dataset, k, num_classes, num_clients, replace=False):
+        class_examples = [[] for _ in range(num_classes)]
 
-    client_indices = []
-    for _ in range(num_clients):
-        indices = []
-        for class_idx in range(num_classes):
-            indices += np.random.choice(
-                class_examples[class_idx], k, replace=replace
-            ).tolist()
-        client_indices.append(indices)
+        for idx, (_, label) in enumerate(dataset):
+            class_examples[label].append(idx)
 
-    return client_indices
+        client_indices = []
+        for _ in range(num_clients):
+            indices = []
+            for class_idx in range(num_classes):
+                indices += np.random.choice(
+                    class_examples[class_idx], k, replace=replace
+                ).tolist()
+            client_indices.append(indices)
+
+        return client_indices
 
 
 def k_shot_data(dataset, num_clients, k_shot, dataset_name):

@@ -40,11 +40,12 @@ class RaFFM:
         """
         arc_config = arc_config_sampler(**self.elastic_config)
         if "bert" == self.model.config.model_type.lower():
-            return bert_module_handler(self.model, arc_config)
+            subnetwork, total_params = bert_module_handler(self.model, arc_config)
         elif "vit" == self.model.config.model_type.lower():
-            return vit_module_handler(self.model, arc_config)
+            subnetwork, total_params = vit_module_handler(self.model, arc_config)
         else:
             raise NotImplementedError
+        return subnetwork, total_params, arc_config
 
     def resource_aware_model(self, arc_config):
         if "bert" == self.model.config.model_type.lower():

@@ -63,7 +63,7 @@ raffm_model = RaFFM(model.to("cpu"))
 print("Original FM number of parameters:",raffm_model.total_params)
 
 #Random sample a scaled FM
-submodel, config, params = raffm_model.random_resource_aware_model()
+submodel, params, config = raffm_model.random_resource_aware_model()
 print("subnetwork params",params)
 ```
 

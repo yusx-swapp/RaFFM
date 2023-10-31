@@ -92,6 +92,7 @@ def federated_learning(
                     (
                         local_model,
                         local_model_params,
+                        arc_config,
                     ) = global_model.random_resource_aware_model()
             elif args.method == "vanilla":
                 local_model = copy.deepcopy(global_model.model)
