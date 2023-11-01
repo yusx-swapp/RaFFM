@@ -14,6 +14,7 @@ from transformers import (
     TrainingArguments,
     Trainer,
 )
+import peft
 from raffm.utils import DatasetSplitter, step_lr, EarlyStopping
 from raffm import RaFFM
 
