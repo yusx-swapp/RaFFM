@@ -86,4 +86,5 @@ class RaFFM:
 
     def load_ckpt(self, dir):
         self.model.from_pretrained(dir)
-        self.elastic_config = torch.load(os.path.join(dir, "elastic.pt"))
+        if os.path.exists(os.path.join(dir, "elastic.pt")):
+            self.elastic_config = torch.load(os.path.join(dir, "elastic.pt"))

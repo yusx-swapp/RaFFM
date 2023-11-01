@@ -27,7 +27,7 @@ RaFFM enables **resource-aware foundation model deployments** in edge-FL based o
 ### Download Links
 We provide resource-aware Foundation model checkpoints trained via FL. You can download here:
 
-- [ViT-base Large CIFAR-10]() [Trained on *Large-budget*  system heterogeneity setting]
+- [ViT-base Large CIFAR-10](https://iowastate-my.sharepoint.com/:f:/g/personal/yusx_iastate_edu/EkAE4V6VyO1JnpN9j-0QznUBjtREcIVttgVL9sjeP7mfvA?e=LbCmHk) [Trained on *Large-budget*  system heterogeneity setting]
 - [ViT-base Small CIFAR-10](https://iowastate-my.sharepoint.com/:u:/g/personal/yusx_iastate_edu/EYVquHHGqFBLlwZpSrfVTUYBJDcOCvD3Cw2AWk3BdseWjQ?e=zBtyyM) [Trained on *Small-budget*  system heterogeneity setting]
 
 
@@ -107,6 +107,7 @@ Sixing Yu: <yusx@iastate.edu>
 - [x] ViT FL simulation scripts
 - [x] Tensorboard logger
 - [x] Elastic space APIs for system-heteo
+- [x] Load ckpt high-level APIs
 - [ ] Evaluate Scripts for resource-aware models
 - [ ] BERT-large, FLAN-T5 ckpts
 - [ ] Simulation scripts on SQUAD, GLUE

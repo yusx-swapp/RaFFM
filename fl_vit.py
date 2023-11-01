@@ -35,23 +35,6 @@ def compute_metrics(p):
     return {"accuracy": accuracy["accuracy"], "f1": f1["f1"]}
 
 
-def initialize_model(model_name, num_classes, feature_extract, use_pretrained=True):
-    if model_name == "vit":
-        model_ft = ViTForImageClassification.from_pretrained(
-            "google/vit-base-patch16-224",
-            num_labels=num_classes,
-            ignore_mismatched_sizes=True,
-        )
-    elif model_name == "vit-large":
-        model_ft = ViTForImageClassification.from_pretrained(
-            "google/vit-large-patch16-224-in21k",
-            num_labels=num_classes,
-            ignore_mismatched_sizes=True,
-        )
-
-    return model_ft
-
-
 def federated_learning(
     args, global_model: RaFFM, local_datasets, val_dataset, test_dataset=None
 ):
@@ -136,25 +119,29 @@ def federated_learning(
             )
             train_results = trainer.train()
 
-            print(f"Eval local model {client_id}\n")
-            metrics = trainer.evaluate(val_dataset)
+            if round > 50:
+                print(f"Eval local model {client_id}\n")
+                metrics = trainer.evaluate(val_dataset)
 
-            trainer.log_metrics("eval", metrics)
-            val_accuracy, val_f1_score = metrics["eval_accuracy"], metrics["eval_f1"]
-            writer.add_scalar(
-                str(client_id) + "/eval_accuracy",
-                val_accuracy,
-                round,
-            )
-            writer.add_scalar(
-                str(client_id) + "/eval_f1",
-                val_f1_score,
-                round,
-            )
+                trainer.log_metrics("eval", metrics)
+                val_accuracy, val_f1_score = (
+                    metrics["eval_accuracy"],
+                    metrics["eval_f1"],
+                )
+                writer.add_scalar(
+                    str(client_id) + "/eval_accuracy",
+                    val_accuracy,
+                    round,
+                )
+                writer.add_scalar(
+                    str(client_id) + "/eval_f1",
+                    val_f1_score,
+                    round,
+                )
 
             local_model.to("cpu")
             local_models.append(local_model)
-            print("Training finished!")
+            print("Local training finished!")
 
         print(f"Eval global model in communication round {round}")
         global_model.aggregate(local_models)
@@ -207,6 +194,10 @@ def federated_learning(
             global_model.model.save_pretrained(
                 os.path.join(args.save_dir, args.dataset, "best_model")
             )
+
+            global_model.save_ckpt(
+                os.path.join(args.save_dir, args.dataset, "best_model")
+            )
         if val_f1_score > best_f1:
             best_f1 = val_f1_score
         writer.add_scalar(
@@ -253,7 +244,7 @@ def transform(example_batch, processor):
 
 def main(args):
     if args.model == "vit":
-        model_name = "google/vit-base-patch16-224"
+        model_name = "google/vit-base-patch16-224-in21k"
     elif args.model == "vit-large":
         model_name = "google/vit-large-patch16-224-in21k"
 
@@ -288,8 +279,15 @@ def main(args):
     # load/initialize global model and convert to raffm model
     if args.resume_ckpt:
         ckpt_path = args.resume_ckpt
+        elastic_config = (
+            os.path.join(ckpt_path, "elastic.pt")
+            if os.path.exists(os.path.join(ckpt_path, "elastic.pt"))
+            else None
+        )
+
     else:
         ckpt_path = model_name
+        elastic_config = None
 
     model = ViTForImageClassification.from_pretrained(
         ckpt_path,
@@ -299,13 +297,11 @@ def main(args):
         ignore_mismatched_sizes=True,
     )
 
-    global_model = RaFFM(model.to("cpu"))
+    global_model = RaFFM(model.to("cpu"), elastic_config)
     global_model = federated_learning(
         args, global_model, local_datasets, prepared_ds["validation"]
     )
-    global_model.model.save_pretrained(
-        os.path.join(args.save_dir, args.dataset, "final")
-    )
+    global_model.save_ckpt(os.path.join(args.save_dir, args.dataset, "final"))
 
 
 if __name__ == "__main__":
