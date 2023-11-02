@@ -106,7 +106,7 @@ def federated_learning(
                 # save_total_limit=2,
                 remove_unused_columns=False,
                 push_to_hub=False,
-                # report_to="tensorboard",
+                report_to="none",
                 # load_best_model_at_end=True,
             )
 
@@ -162,7 +162,7 @@ def federated_learning(
             # save_total_limit=2,
             remove_unused_columns=False,
             push_to_hub=False,
-            # report_to="tensorboard",
+            report_to="none",
             # load_best_model_at_end=True,
         )
 
