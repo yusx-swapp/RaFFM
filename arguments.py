@@ -78,5 +78,11 @@ def arguments():
     parser.add_argument(
         "--batch_size", type=int, help="per device batch size", default=64
     )
+
+    # PEFT arguments
+    parser.add_argument(
+        "--peft", action="store_true", help="parameter efficient finetuning"
+    )
+
     args = parser.parse_args()
     return args

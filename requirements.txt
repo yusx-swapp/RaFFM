@@ -6,3 +6,4 @@ transformers[torch]
 tensorboard
 evaluate
 datasets
+peft

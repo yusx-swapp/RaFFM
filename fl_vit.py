@@ -7,29 +7,30 @@ import functools
 import evaluate
 from torch.utils.tensorboard import SummaryWriter
 import copy
-import argparse
 from transformers import (
     ViTForImageClassification,
     ViTImageProcessor,
     TrainingArguments,
     Trainer,
 )
+from peft import LoraConfig, get_peft_model
 from raffm.utils import DatasetSplitter, step_lr, EarlyStopping
 from raffm import RaFFM
 from arguments import arguments
 
 
-@staticmethod
-def compute_metrics(p):
+# @staticmethod
+def compute_metrics(eval_pred):
     accuracy_metric = evaluate.load("accuracy")
     f1_metric = evaluate.load("f1")
 
     accuracy = accuracy_metric.compute(
-        predictions=np.argmax(p.predictions, axis=1), references=p.label_ids
+        predictions=np.argmax(eval_pred.predictions, axis=1),
+        references=eval_pred.label_ids,
     )
     f1 = f1_metric.compute(
-        predictions=np.argmax(p.predictions, axis=1),
-        references=p.label_ids,
+        predictions=np.argmax(eval_pred.predictions, axis=1),
+        references=eval_pred.label_ids,
         average="weighted",
     )
 
@@ -95,6 +96,7 @@ def federated_learning(
             training_args = TrainingArguments(
                 output_dir=os.path.join(args.save_dir, "clients", str(client_id)),
                 per_device_train_batch_size=args.batch_size,
+                per_device_eval_batch_size=args.batch_size,
                 evaluation_strategy="no",
                 save_strategy="no",
                 num_train_epochs=args.num_local_epochs,
@@ -105,6 +107,7 @@ def federated_learning(
                 # save_total_limit=2,
                 remove_unused_columns=False,
                 push_to_hub=False,
+                label_names=["labels"],
                 # report_to="tensorboard",
                 # load_best_model_at_end=True,
             )
@@ -120,7 +123,7 @@ def federated_learning(
             )
             train_results = trainer.train()
 
-            if round > 50:
+            if round > 80:
                 print(f"Eval local model {client_id}\n")
                 metrics = trainer.evaluate(val_dataset)
 
@@ -150,6 +153,7 @@ def federated_learning(
         training_args = TrainingArguments(
             output_dir=os.path.join(args.save_dir, "global"),
             per_device_train_batch_size=args.batch_size,
+            per_device_eval_batch_size=args.batch_size,
             evaluation_strategy="no",
             save_strategy="no",
             num_train_epochs=args.num_local_epochs,
@@ -160,6 +164,7 @@ def federated_learning(
             # save_total_limit=2,
             remove_unused_columns=False,
             push_to_hub=False,
+            label_names=["labels"],
             # report_to="tensorboard",
             # load_best_model_at_end=True,
         )
@@ -297,6 +302,19 @@ def main(args):
         label2id={c: str(i) for i, c in enumerate(labels)},
         ignore_mismatched_sizes=True,
     )
+    if args.peft:
+        config = LoraConfig(
+            r=16,
+            lora_alpha=16,
+            target_modules=["query", "key", "value"],
+            lora_dropout=0.1,
+            bias="none",
+            modules_to_save=["classifier"],
+        )
+        print(f"[Warning]: default PEFT method LoRA, default configure:", config)
+
+        model = get_peft_model(model, config)
+        model.print_trainable_parameters()
 
     global_model = RaFFM(model.to("cpu"), elastic_config)
     global_model = federated_learning(
