@@ -107,6 +107,7 @@ def federated_learning(
                 remove_unused_columns=False,
                 push_to_hub=False,
                 report_to="none",
+                label_names=["labels"],
                 # load_best_model_at_end=True,
             )
 
@@ -121,7 +122,7 @@ def federated_learning(
             )
             train_results = trainer.train()
 
-            if round > 50:
+            if round > 95:
                 print(f"Eval local model {client_id}\n")
                 metrics = trainer.evaluate(val_dataset)
 
@@ -163,6 +164,7 @@ def federated_learning(
             remove_unused_columns=False,
             push_to_hub=False,
             report_to="none",
+            label_names=["labels"],
             # load_best_model_at_end=True,
         )
 
