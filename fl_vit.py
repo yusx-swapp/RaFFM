@@ -146,7 +146,15 @@ def federated_learning(
             local_models.append(local_model)
             print("Local training finished!")
 
-        print(f"Eval global model in communication round {round}")
+        avg_trainable_params = avg_trainable_params / len(client_indices)
+        writer.add_scalar(
+            "global/params",
+            avg_trainable_params,
+            round,
+        )
+        print(
+            f"Communication round {round} federated learning finished. \n Average trainable parameters:{avg_trainable_params}.\n Eval global model."
+        )
         global_model.aggregate(local_models)
 
         training_args = TrainingArguments(
