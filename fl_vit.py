@@ -95,6 +95,7 @@ def federated_learning(
             training_args = TrainingArguments(
                 output_dir=os.path.join(args.save_dir, "clients", str(client_id)),
                 per_device_train_batch_size=args.batch_size,
+                per_device_eval_batch_size=args.batch_size,
                 evaluation_strategy="no",
                 save_strategy="no",
                 num_train_epochs=args.num_local_epochs,
@@ -150,6 +151,7 @@ def federated_learning(
         training_args = TrainingArguments(
             output_dir=os.path.join(args.save_dir, "global"),
             per_device_train_batch_size=args.batch_size,
+            per_device_eval_batch_size=args.batch_size,
             evaluation_strategy="no",
             save_strategy="no",
             num_train_epochs=args.num_local_epochs,
