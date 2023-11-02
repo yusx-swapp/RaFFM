@@ -168,12 +168,7 @@ def federated_learning(
             # save_total_limit=2,
             remove_unused_columns=False,
             push_to_hub=False,
-<<<<<<< HEAD
-            label_names=["labels"],
-            # report_to="tensorboard",
-=======
             report_to="none",
->>>>>>> 2529e25c3c05de07b8a71a25c74739e4b4b0254e
             # load_best_model_at_end=True,
         )
 
