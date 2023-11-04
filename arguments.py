@@ -84,5 +84,12 @@ def arguments():
         "--peft", action="store_true", help="parameter efficient finetuning"
     )
 
+    parser.add_argument(
+        "--adapter_ckpt",
+        type=str,
+        default=None,
+        help="pre-trained adapter ckpt dir",
+    )
+
     args = parser.parse_args()
     return args
