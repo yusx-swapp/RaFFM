@@ -10,7 +10,7 @@ This is the official implementation for the paper:
 - [x] [10/30/2023] Demo scripts for train ViT on CIFAR-10/100 via heterogeneous resource FL
 - [x] [10/31/2023] Pushed elastic space APIs for system-heteo
 - [x] [11/02/2023] ViT-base CIFAR-100 checkpoints released, trained on *large-budget* edge-FL settings with 100 clients.
-
+- [x] [11/05/2023] Resource-aware FMs with adapter published in branch ***adapter***
 ## Installation
 
 ```bash
