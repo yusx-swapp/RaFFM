@@ -9,8 +9,8 @@ This is the official implementation for the paper:
 - [x] [10/30/2023] Scalable ViT Checkpoints released for heterogeneous resource edge-clients
 - [x] [10/30/2023] Demo scripts for train ViT on CIFAR-10/100 via heterogeneous resource FL
 - [x] [10/31/2023] Pushed elastic space APIs for system-heteo
-
-
+- [x] [11/02/2023] ViT-base CIFAR-100 checkpoints released, trained on *large-budget* edge-FL settings with 100 clients.
+- [x] [11/05/2023] Resource-aware FMs with adapter published in branch ***adapter***
 ## Installation
 
 ```bash
@@ -25,10 +25,11 @@ pip install -r requirements.txt
 RaFFM enables **resource-aware foundation model deployments** in edge-FL based on client local resources. That means RaFFM can dynamically scale down the size of FMs to heterogeneous resource local clients and enables efficient and fair local resource utilization.
 
 ### Download Links
-We provide resource-aware Foundation model checkpoints trained via FL. You can download here:
+We provide resource-aware FMs checkpoints trained via FL. You can download here:
 
-- [ViT-base Large CIFAR-10](https://iowastate-my.sharepoint.com/:f:/g/personal/yusx_iastate_edu/EkAE4V6VyO1JnpN9j-0QznUBjtREcIVttgVL9sjeP7mfvA?e=LbCmHk) [Trained on *Large-budget*  system heterogeneity setting]
-- [ViT-base Small CIFAR-10](https://iowastate-my.sharepoint.com/:u:/g/personal/yusx_iastate_edu/EYVquHHGqFBLlwZpSrfVTUYBJDcOCvD3Cw2AWk3BdseWjQ?e=zBtyyM) [Trained on *Small-budget*  system heterogeneity setting]
+- [ViT-base CIFAR-100 *large-budget*](https://iowastate-my.sharepoint.com/:f:/g/personal/yusx_iastate_edu/El-nYhaOiINOoLHXsqqXqAkBOUEc_ohu-gGK0ms8neEFDQ) [Trained on *Large-budget*  system heterogeneity edge-FL with 100 clients]
+- [ViT-base CIFAR-10 *large-budget*](https://iowastate-my.sharepoint.com/:f:/g/personal/yusx_iastate_edu/EkAE4V6VyO1JnpN9j-0QznUBjtREcIVttgVL9sjeP7mfvA) [Trained on *Large-budget*  system heterogeneity edge-FL with 100 clients]
+- [ViT-base CIFAR-10 *small-budget*](https://iowastate-my.sharepoint.com/:u:/g/personal/yusx_iastate_edu/EYVquHHGqFBLlwZpSrfVTUYBJDcOCvD3Cw2AWk3BdseWjQ) [Trained on *Small-budget*  system heterogeneity edge-FL with 100 clients]
 
 
 ### Checkpoints Usage
