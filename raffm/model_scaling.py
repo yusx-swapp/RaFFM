@@ -250,7 +250,7 @@ def vit_adapter_module_handler(model: PeftModel, peft_config: PeftConfig, arc_co
     )
     from transformers import ViTConfig
 
-    class NewViTSelfAttention(ViTSelfAttention):
+    class ViTSelfAttention(ViTSelfAttention):
         def __init__(self, config: ViTConfig):
             super().__init__(config)
 
@@ -270,7 +270,7 @@ def vit_adapter_module_handler(model: PeftModel, peft_config: PeftConfig, arc_co
 
             self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
 
-    class NewViTSelfOutput(ViTSelfOutput):
+    class ViTSelfOutput(ViTSelfOutput):
         def __init__(self, config: ViTConfig):
             super().__init__(config)
             self.dense = nn.Linear(
@@ -279,12 +279,12 @@ def vit_adapter_module_handler(model: PeftModel, peft_config: PeftConfig, arc_co
             )
             self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
-    class NewViTIntermediate(ViTIntermediate):
+    class ViTIntermediate(ViTIntermediate):
         def __init__(self, config: ViTConfig):
             super().__init__(config)
             self.dense = nn.Linear(config.hidden_size, config.intermediate_size)
 
-    class NewViTOutput(ViTOutput):
+    class ViTOutput(ViTOutput):
         def __init__(self, config):
             super().__init__(config)
             self.dense = nn.Linear(config.intermediate_size, config.hidden_size)
@@ -301,18 +301,24 @@ def vit_adapter_module_handler(model: PeftModel, peft_config: PeftConfig, arc_co
             arc["atten_out"] // new_config.num_attention_heads
         )  # Ensure it divides evenly
         new_config.intermediate_size = arc["inter_hidden"]
-        new_attention_layer = inject_adapter_in_model(
-            peft_config, NewViTSelfAttention(config=new_config)
-        )
-        new_out_layer = inject_adapter_in_model(
-            peft_config, NewViTSelfOutput(config=new_config)
-        )
-        new_inter_layer = inject_adapter_in_model(
-            NewViTIntermediate(peft_config, config=new_config)
-        )
-        new_dens_out_layer = inject_adapter_in_model(
-            NewViTOutput(peft_config, config=new_config)
-        )
+
+        if any(
+            item in peft_config.target_modules for item in ["query", "key", "value"]
+        ):
+            new_attention_layer = inject_adapter_in_model(
+                peft_config, ViTSelfAttention(config=new_config)
+            )
+
+        if "dense" in peft_config.target_modules:
+            new_out_layer = inject_adapter_in_model(
+                peft_config, ViTSelfOutput(config=new_config)
+            )
+            new_inter_layer = inject_adapter_in_model(
+                ViTIntermediate(peft_config, config=new_config)
+            )
+            new_dens_out_layer = inject_adapter_in_model(
+                ViTOutput(peft_config, config=new_config)
+            )
 
         load_subnet_state_dict(new_attention_layer, layer.attention.attention)
         load_subnet_state_dict(new_out_layer, layer.attention.output)
