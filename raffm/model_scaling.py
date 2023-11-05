@@ -3,6 +3,11 @@ import copy
 from torch import nn
 import time
 from .utils import calculate_params
+from peft import (
+    PeftModel,
+    PeftConfig,
+    inject_adapter_in_model,
+)
 
 __all__ = ["bert_module_handler", "arc_config_sampler"]
 
@@ -219,6 +224,95 @@ def vit_module_handler(model, arc_config):
         new_out_layer = NewViTSelfOutput(config=new_config)
         new_inter_layer = NewViTIntermediate(config=new_config)
         new_dens_out_layer = NewViTOutput(config=new_config)
+
+        load_subnet_state_dict(new_attention_layer, layer.attention.attention)
+        load_subnet_state_dict(new_out_layer, layer.attention.output)
+        load_subnet_state_dict(new_inter_layer, layer.intermediate)
+        load_subnet_state_dict(new_dens_out_layer, layer.output)
+
+        layer.attention.attention = new_attention_layer
+        layer.attention.output = new_out_layer
+        layer.intermediate = new_inter_layer
+        layer.output = new_dens_out_layer
+
+    total_params = calculate_params(subnetwork)
+
+    return subnetwork, total_params
+
+
+@staticmethod
+def vit_adapter_module_handler(model: PeftModel, peft_config: PeftConfig, arc_config):
+    from transformers.models.vit.modeling_vit import (
+        ViTSelfAttention,
+        ViTSelfOutput,
+        ViTIntermediate,
+        ViTOutput,
+    )
+    from transformers import ViTConfig
+
+    class NewViTSelfAttention(ViTSelfAttention):
+        def __init__(self, config: ViTConfig):
+            super().__init__(config)
+
+            self.num_attention_heads = config.num_attention_heads
+            self.attention_head_size = config.attention_head_size
+            self.all_head_size = self.num_attention_heads * self.attention_head_size
+
+            self.query = nn.Linear(
+                config.hidden_size, self.all_head_size, bias=config.qkv_bias
+            )
+            self.key = nn.Linear(
+                config.hidden_size, self.all_head_size, bias=config.qkv_bias
+            )
+            self.value = nn.Linear(
+                config.hidden_size, self.all_head_size, bias=config.qkv_bias
+            )
+
+            self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
+
+    class NewViTSelfOutput(ViTSelfOutput):
+        def __init__(self, config: ViTConfig):
+            super().__init__(config)
+            self.dense = nn.Linear(
+                config.attention_head_size * config.num_attention_heads,
+                config.hidden_size,
+            )
+            self.dropout = nn.Dropout(config.hidden_dropout_prob)
+
+    class NewViTIntermediate(ViTIntermediate):
+        def __init__(self, config: ViTConfig):
+            super().__init__(config)
+            self.dense = nn.Linear(config.hidden_size, config.intermediate_size)
+
+    class NewViTOutput(ViTOutput):
+        def __init__(self, config):
+            super().__init__(config)
+            self.dense = nn.Linear(config.intermediate_size, config.hidden_size)
+
+    subnetwork = copy.deepcopy(model).cpu()
+
+    bert_layers = subnetwork.vit.encoder.layer
+
+    for i, (layer, key) in enumerate(zip(bert_layers, arc_config)):
+        arc = arc_config[key]
+        new_config = ViTConfig.from_dict(model.config.to_dict())
+        # new_config.hidden_size = arc  # Set to the new output dimension
+        new_config.attention_head_size = (
+            arc["atten_out"] // new_config.num_attention_heads
+        )  # Ensure it divides evenly
+        new_config.intermediate_size = arc["inter_hidden"]
+        new_attention_layer = inject_adapter_in_model(
+            peft_config, NewViTSelfAttention(config=new_config)
+        )
+        new_out_layer = inject_adapter_in_model(
+            peft_config, NewViTSelfOutput(config=new_config)
+        )
+        new_inter_layer = inject_adapter_in_model(
+            NewViTIntermediate(peft_config, config=new_config)
+        )
+        new_dens_out_layer = inject_adapter_in_model(
+            NewViTOutput(peft_config, config=new_config)
+        )
 
         load_subnet_state_dict(new_attention_layer, layer.attention.attention)
         load_subnet_state_dict(new_out_layer, layer.attention.output)
