@@ -334,6 +334,12 @@ def main(args):
     if args.peft:
         if args.adapter_ckpt:
             model = PeftModel.from_pretrained(model, args.adapter_ckpt)
+            elastic_config = (
+                os.path.join(args.adapter_ckpt, "elastic.pt")
+                if os.path.exists(os.path.join(args.adapter_ckpt, "elastic.pt"))
+                else None
+            )
+
         else:
             config = LoraConfig(
                 r=16,
