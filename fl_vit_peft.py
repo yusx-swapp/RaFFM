@@ -15,7 +15,7 @@ from transformers import (
 )
 from peft import LoraConfig, get_peft_model, PeftModel, PeftConfig
 from raffm.utils import DatasetSplitter, step_lr, EarlyStopping
-from raffm import RaFFM
+from raffm import RaFFM, RaPEFT
 from arguments import arguments
 
 
@@ -38,7 +38,7 @@ def compute_metrics(eval_pred):
 
 
 def federated_learning(
-    args, global_model: RaFFM, local_datasets, val_dataset, test_dataset=None
+    args, global_model: RaPEFT, local_datasets, val_dataset, test_dataset=None
 ):
     early_stopping = EarlyStopping(patience=5, verbose=True)
 
@@ -46,6 +46,8 @@ def federated_learning(
     best_acc = 0.0
     best_f1 = 0.0
 
+    if args.spp:
+        global_model.salient_parameter_prioritization()
     for round in range(args.num_rounds):
         local_models = []
         lr = step_lr(args.lr, round, args.step_size, 0.98)
@@ -58,9 +60,8 @@ def federated_learning(
             replace=False,
         )
 
-        if args.spp:
-            global_model.salient_parameter_prioritization()
         avg_trainable_params = 0
+        avg_model_param = 0
         processor = ViTImageProcessor.from_pretrained("google/vit-base-patch16-224")
         # Train the model on each client's dataset
         # for local_dataloader in local_dataloaders:
@@ -71,26 +72,39 @@ def federated_learning(
             if args.method == "raffm":
                 if idx == 0:
                     local_model = copy.deepcopy(global_model.model)
-                    local_model_params = global_model.total_params
+                    # local_model_params = global_model.total_params
 
                 else:
                     (
                         local_model,
                         local_model_params,
                         arc_config,
-                    ) = global_model.random_resource_aware_model()
+                    ) = global_model.random_peft_model()
             elif args.method == "vanilla":
                 local_model = copy.deepcopy(global_model.model)
-                local_model_params = global_model.total_params
+                # local_model_params = global_model.total_params
 
-            avg_trainable_params += local_model_params
+            (
+                local_trainable_params,
+                local_model_params,
+            ) = local_model.get_nb_trainable_parameters()
+
+            avg_trainable_params += local_trainable_params
+            avg_model_param += local_model_params
 
             print(
-                f"Client {client_id} local model has {local_model_params} parameters out of {global_model.total_params} parameters in communication round {round}"
+                f"Client {client_id} local backbone model has {local_model_params} parameters out of {global_model.total_params} parameters in communication round {round}"
+            )
+            local_model.print_trainable_parameters()
+
+            writer.add_scalar(
+                str(client_id) + "/backbone_params",
+                local_model_params,
+                round,
             )
             writer.add_scalar(
-                str(client_id) + "/params",
-                local_model_params,
+                str(client_id) + "/tranable_params",
+                local_trainable_params,
                 round,
             )
             training_args = TrainingArguments(
@@ -148,11 +162,18 @@ def federated_learning(
             print("Local training finished!")
 
         avg_trainable_params = avg_trainable_params / len(client_indices)
+        avg_model_param = avg_model_param / len(client_indices)
         writer.add_scalar(
-            "global/params",
+            "global/tranable_params",
             avg_trainable_params,
             round,
         )
+        writer.add_scalar(
+            "global/backbone_params",
+            avg_model_param,
+            round,
+        )
+
         print(
             f"Communication round {round} federated learning finished. \n Average trainable parameters:{avg_trainable_params}.\n Eval global model."
         )
@@ -327,7 +348,10 @@ def main(args):
             model = get_peft_model(model, config)
         model.print_trainable_parameters()
 
-    global_model = RaFFM(model.to("cpu"), elastic_config)
+    # global_model = RaFFM(model.to("cpu"), elastic_config)
+    global_model = RaPEFT(
+        model=model, elastic_config=elastic_config, peft_config=config
+    )
     global_model = federated_learning(
         args, global_model, local_datasets, prepared_ds["validation"]
     )

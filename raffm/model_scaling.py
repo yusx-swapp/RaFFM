@@ -9,7 +9,13 @@ from peft import (
     inject_adapter_in_model,
 )
 
-__all__ = ["bert_module_handler", "arc_config_sampler"]
+
+__all__ = [
+    "bert_module_handler",
+    "vit_module_handler",
+    "vit_peft_module_handler",
+    "arc_config_sampler",
+]
 
 
 @staticmethod
@@ -17,16 +23,13 @@ def load_subnet_state_dict(sub_model, org_model):
     for (sub_name, sub_param), (org_name, org_param) in zip(
         sub_model.named_parameters(), org_model.named_parameters()
     ):
-        if (
-            sub_param.requires_grad and org_param.requires_grad
-        ):  # Ensure the parameter is a 2D weight matrix
-            if len(sub_param.shape) == 2:
-                truncated_weight = org_param.data[
-                    : sub_param.shape[0], : sub_param.shape[1]
-                ]
-            else:
-                truncated_weight = org_param.data[: sub_param.shape[0]]
-            sub_param.data.copy_(truncated_weight)
+        if len(sub_param.shape) == 2:
+            truncated_weight = org_param.data[
+                : sub_param.shape[0], : sub_param.shape[1]
+            ]
+        else:
+            truncated_weight = org_param.data[: sub_param.shape[0]]
+        sub_param.data.copy_(truncated_weight)
 
 
 @staticmethod
@@ -241,7 +244,7 @@ def vit_module_handler(model, arc_config):
 
 
 @staticmethod
-def vit_adapter_module_handler(model: PeftModel, peft_config: PeftConfig, arc_config):
+def vit_peft_module_handler(model: PeftModel, peft_config: PeftConfig, arc_config):
     from transformers.models.vit.modeling_vit import (
         ViTSelfAttention,
         ViTSelfOutput,
@@ -301,23 +304,23 @@ def vit_adapter_module_handler(model: PeftModel, peft_config: PeftConfig, arc_co
             arc["atten_out"] // new_config.num_attention_heads
         )  # Ensure it divides evenly
         new_config.intermediate_size = arc["inter_hidden"]
+        new_attention_layer = ViTSelfAttention(config=new_config).requires_grad_(False)
+        new_out_layer = ViTSelfOutput(config=new_config).requires_grad_(False)
+        new_inter_layer = ViTIntermediate(config=new_config).requires_grad_(False)
+        new_dens_out_layer = ViTOutput(config=new_config).requires_grad_(False)
 
         if any(
             item in peft_config.target_modules for item in ["query", "key", "value"]
         ):
             new_attention_layer = inject_adapter_in_model(
-                peft_config, ViTSelfAttention(config=new_config)
+                peft_config, new_attention_layer
             )
 
         if "dense" in peft_config.target_modules:
-            new_out_layer = inject_adapter_in_model(
-                peft_config, ViTSelfOutput(config=new_config)
-            )
-            new_inter_layer = inject_adapter_in_model(
-                ViTIntermediate(peft_config, config=new_config)
-            )
+            new_out_layer = inject_adapter_in_model(peft_config, new_out_layer)
+            new_inter_layer = inject_adapter_in_model(peft_config, new_inter_layer)
             new_dens_out_layer = inject_adapter_in_model(
-                ViTOutput(peft_config, config=new_config)
+                peft_config, new_dens_out_layer
             )
 
         load_subnet_state_dict(new_attention_layer, layer.attention.attention)
@@ -330,9 +333,10 @@ def vit_adapter_module_handler(model: PeftModel, peft_config: PeftConfig, arc_co
         layer.intermediate = new_inter_layer
         layer.output = new_dens_out_layer
 
-    total_params = calculate_params(subnetwork)
+    # total_params = calculate_params(subnetwork)
+    trainable_params, all_param = subnetwork.get_nb_trainable_parameters()
 
-    return subnetwork, total_params
+    return subnetwork, trainable_params
 
 
 def _test():
