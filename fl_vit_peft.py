@@ -137,7 +137,7 @@ def federated_learning(
             )
             train_results = trainer.train()
 
-            if round > 95:
+            if round > args.num_rounds - 10:
                 print(f"Eval local model {client_id}\n")
                 metrics = trainer.evaluate(val_dataset)
 
@@ -289,7 +289,7 @@ def main(args):
         dataset = dataset.rename_column("fine_label", "label")
 
     train_val = dataset["train"].train_test_split(
-        test_size=0.2, stratify_by_column="label"
+        test_size=0.2, stratify_by_column="label", seed=123
     )
     dataset["train"] = train_val["train"]
     dataset["validation"] = train_val["test"]
@@ -339,7 +339,7 @@ def main(args):
                 if os.path.exists(os.path.join(args.adapter_ckpt, "elastic.pt"))
                 else None
             )
-
+            config = None
         else:
             config = LoraConfig(
                 r=16,
