@@ -315,14 +315,14 @@ def main(args):
     if args.resume_ckpt:
         ckpt_path = args.resume_ckpt
         elastic_config = (
-            os.path.join(ckpt_path, "elastic.pt")
-            if os.path.exists(os.path.join(ckpt_path, "elastic.pt"))
-            else None
+            os.path.join(ckpt_path, "elastic_space.json")
+            if os.path.exists(os.path.join(ckpt_path, "elastic_space.json"))
+            else args.elastic_config
         )
 
     else:
         ckpt_path = model_name
-        elastic_config = None
+        elastic_config = args.elastic_config
 
     model = ViTForImageClassification.from_pretrained(
         ckpt_path,
