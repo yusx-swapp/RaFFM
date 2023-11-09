@@ -91,5 +91,11 @@ def arguments():
         help="pre-trained adapter ckpt dir",
     )
 
+    parser.add_argument(
+        "--elastic_space",
+        type=str,
+        default=None,
+        help="Elastic space file path",
+    )
     args = parser.parse_args()
     return args

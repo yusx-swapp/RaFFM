@@ -2,6 +2,36 @@ import torch
 from torch.nn import Parameter
 import random
 from datasets import Dataset
+import json
+
+
+@staticmethod
+def save_dict_to_file(dictionary, file_path):
+    """
+    Saves a dictionary object to a file using JSON format.
+
+    :param dictionary: Dictionary to save.
+    :param file_path: Path to the file to save the dictionary in.
+    """
+
+    # Write the dictionary to file, ensuring it is in JSON format
+    with open(file_path, "w") as file:
+        json.dump(dictionary, file)
+
+
+@staticmethod
+def load_dict_from_file(file_path):
+    """
+    Loads a dictionary object from a file which is in JSON format.
+
+    :param file_path: Path to the file to load the dictionary from.
+    :return: The dictionary that was loaded from the file.
+    """
+
+    # Read the dictionary from file, assuming it is in JSON format
+    with open(file_path, "r") as file:
+        dictionary = json.load(file)
+    return dictionary
 
 
 @staticmethod

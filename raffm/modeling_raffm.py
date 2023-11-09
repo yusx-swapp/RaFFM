@@ -11,7 +11,7 @@ from .model_scaling import (
     vit_peft_module_handler,
 )
 from .param_prioritization import *
-from .utils import calculate_params
+from .utils import calculate_params, save_dict_to_file, load_dict_from_file
 from peft import PeftConfig, PeftModel
 
 # __all__ = ["salient_submodel_extraction"]
@@ -25,8 +25,8 @@ class RaFFM:
         if not elastic_config:
             # set defalt search space configuration (this is defalt setting for bert)
             elastic_config = {
-                # "atten_out_space": [768 - i * 12 for i in range(0, 15)],
-                "atten_out_space": [768],
+                "atten_out_space": [768 - i * 12 for i in range(0, 15)],
+                # "atten_out_space": [768],
                 "inter_hidden_space": [3072 - i * 64 for i in range(0, 20)],
                 "out_hidden_space": [768 - i * 24 for i in range(0, 15)],
             }
@@ -34,8 +34,12 @@ class RaFFM:
                 f"[Warning]: No elastic configuration provides. Set to the defalt elastic space {elastic_config}."
             )
         elif isinstance(elastic_config, str):
-            elastic_config = torch.load(elastic_config)
-        assert isinstance(elastic_config, dict), "Invalid elastic_config"
+            elastic_config = load_dict_from_file(elastic_config)
+
+        assert isinstance(
+            elastic_config, dict
+        ), "Invalid elastic_config, expect input a dictionary or file path"
+
         self.elastic_config = elastic_config
 
     def random_resource_aware_model(self):
@@ -88,12 +92,15 @@ class RaFFM:
 
     def save_ckpt(self, dir):
         self.model.save_pretrained(os.path.join(dir))
-        torch.save(self.elastic_config, os.path.join(dir, "elastic_space.pt"))
+        save_dict_to_file(self.elastic_config, os.path.join(dir, "elastic_space.json"))
 
     def load_ckpt(self, dir):
         self.model.from_pretrained(dir)
-        if os.path.exists(os.path.join(dir, "elastic_space.pt")):
-            self.elastic_config = torch.load(os.path.join(dir, "elastic_space.pt"))
+
+        if os.path.exists(os.path.join(dir, "elastic_space.json")):
+            self.elastic_config = load_dict_from_file(
+                os.path.join(dir, "elastic_space.json")
+            )
 
 
 class RaPEFT(RaFFM):
