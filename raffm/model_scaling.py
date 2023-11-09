@@ -40,6 +40,7 @@ def arc_config_sampler(
     n_layer=12,
     embedding_size=768,
     model_out_hidden=768,
+    smallest=False,
 ):
     """_summary_
 
@@ -66,9 +67,16 @@ def arc_config_sampler(
             out_hidden = model_out_hidden
         else:
             out_hidden = np.random.choice(out_hidden_space)
+            if smallest:
+                out_hidden = min(out_hidden_space)
 
-        inter_hidden = np.random.choice(inter_hidden_space)
-        atten_out = np.random.choice(atten_out_space)
+        if smallest:
+            inter_hidden = min(inter_hidden_space)
+            atten_out = min(atten_out_space)
+
+        else:
+            inter_hidden = np.random.choice(inter_hidden_space)
+            atten_out = np.random.choice(atten_out_space)
 
         arc_config[f"layer_{layer + 1}"] = {
             "atten_out": atten_out,

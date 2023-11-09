@@ -24,3 +24,4 @@ ckpt/
 /log
 .venv
 *test*
+*.json

@@ -60,6 +60,10 @@ class RaFFM:
             raise NotImplementedError
         return subnetwork, total_params, arc_config
 
+    def sample_smallest_model(self):
+        arc_config = arc_config_sampler(**self.elastic_config, smallest=True)
+        return self.resource_aware_model(arc_config), arc_config
+
     def resource_aware_model(self, arc_config):
         if "bert" == self.model.config.model_type.lower():
             return bert_module_handler(self.model, arc_config)
