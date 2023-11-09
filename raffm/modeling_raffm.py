@@ -123,7 +123,7 @@ class RaPEFT(RaFFM):
     def random_peft_model(self):
         arc_config = arc_config_sampler(**self.elastic_config)
 
-        subnetwork, trainable_params = self.resource_aware_peft_model(self, arc_config)
+        subnetwork, trainable_params = self.resource_aware_peft_model(arc_config)
 
         return subnetwork, trainable_params, arc_config
 
