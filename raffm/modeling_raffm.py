@@ -88,12 +88,12 @@ class RaFFM:
 
     def save_ckpt(self, dir):
         self.model.save_pretrained(os.path.join(dir))
-        torch.save(self.elastic_config, os.path.join(dir, "elastic.pt"))
+        torch.save(self.elastic_config, os.path.join(dir, "elastic_space.pt"))
 
     def load_ckpt(self, dir):
         self.model.from_pretrained(dir)
-        if os.path.exists(os.path.join(dir, "elastic.pt")):
-            self.elastic_config = torch.load(os.path.join(dir, "elastic.pt"))
+        if os.path.exists(os.path.join(dir, "elastic_space.pt")):
+            self.elastic_config = torch.load(os.path.join(dir, "elastic_space.pt"))
 
 
 class RaPEFT(RaFFM):
