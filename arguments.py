@@ -78,5 +78,24 @@ def arguments():
     parser.add_argument(
         "--batch_size", type=int, help="per device batch size", default=64
     )
+
+    # PEFT arguments
+    parser.add_argument(
+        "--peft", action="store_true", help="parameter efficient finetuning"
+    )
+
+    parser.add_argument(
+        "--adapter_ckpt",
+        type=str,
+        default=None,
+        help="pre-trained adapter ckpt dir",
+    )
+
+    parser.add_argument(
+        "--elastic_space",
+        type=str,
+        default=None,
+        help="Elastic space file path",
+    )
     args = parser.parse_args()
     return args

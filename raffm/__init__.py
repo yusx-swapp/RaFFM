@@ -1,1 +1,1 @@
-from .modeling_raffm import RaFFM
+from .modeling_raffm import RaFFM, RaPEFT
