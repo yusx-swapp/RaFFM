@@ -52,6 +52,12 @@ def arguments():
         help="Number of clients in a federated learning setting",
     )
     parser.add_argument(
+        "--participation",
+        type=int,
+        default=0.1,
+        help="participation rate each round",
+    )
+    parser.add_argument(
         "--lr", type=float, default=5e-5, help="Learning rate for the optimizer"
     )
     parser.add_argument(
