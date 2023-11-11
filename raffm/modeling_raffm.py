@@ -60,6 +60,10 @@ class RaFFM:
             raise NotImplementedError
         return subnetwork, total_params, arc_config
 
+    def sample_smallest_model(self):
+        arc_config = arc_config_sampler(**self.elastic_config, smallest=True)
+        return self.resource_aware_model(arc_config), arc_config
+
     def resource_aware_model(self, arc_config):
         if "bert" == self.model.config.model_type.lower():
             return bert_module_handler(self.model, arc_config)
@@ -119,15 +123,22 @@ class RaPEFT(RaFFM):
     def random_peft_model(self):
         arc_config = arc_config_sampler(**self.elastic_config)
 
+        subnetwork, trainable_params = self.resource_aware_peft_model(arc_config)
+
+        return subnetwork, trainable_params, arc_config
+
+    def smallest_peft_model(self):
+        arc_config = arc_config_sampler(**self.elastic_config, smallest=True)
+
+        return self.resource_aware_peft_model(arc_config), arc_config
+
+    def resource_aware_peft_model(self, arc_config):
         if "bert" == self.model.config.model_type.lower():
             raise NotImplementedError
         elif "vit" == self.model.config.model_type.lower():
-            subnetwork, trainable_params = vit_peft_module_handler(
-                self.model, self.peft_config, arc_config
-            )
+            return vit_peft_module_handler(self.model, self.peft_config, arc_config)
         else:
             raise NotImplementedError
-        return subnetwork, trainable_params, arc_config
 
     def aggregate(self, local_models):
         """Aggregate local weights via fedavg

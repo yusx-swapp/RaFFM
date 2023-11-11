@@ -92,7 +92,7 @@ def arguments():
     )
 
     parser.add_argument(
-        "--elastic_space",
+        "--elastic_config",
         type=str,
         default=None,
         help="Elastic space file path",
