@@ -62,7 +62,8 @@ class RaFFM:
 
     def sample_smallest_model(self):
         arc_config = arc_config_sampler(**self.elastic_config, smallest=True)
-        return self.resource_aware_model(arc_config), arc_config
+        subnetwork, total_params = self.resource_aware_model(arc_config)
+        return subnetwork, total_params, arc_config
 
     def resource_aware_model(self, arc_config):
         if "bert" == self.model.config.model_type.lower():
@@ -129,8 +130,8 @@ class RaPEFT(RaFFM):
 
     def smallest_peft_model(self):
         arc_config = arc_config_sampler(**self.elastic_config, smallest=True)
-
-        return self.resource_aware_peft_model(arc_config), arc_config
+        subnetwork, trainable_params = self.resource_aware_peft_model(arc_config)
+        return subnetwork, trainable_params, arc_config
 
     def resource_aware_peft_model(self, arc_config):
         if "bert" == self.model.config.model_type.lower():

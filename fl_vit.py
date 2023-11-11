@@ -72,7 +72,12 @@ def federated_learning(
                 if idx == 0:
                     local_model = copy.deepcopy(global_model.model)
                     local_model_params = global_model.total_params
-
+                elif idx == 1:
+                    (
+                        local_model,
+                        local_model_params,
+                        arc_config,
+                    ) = global_model.sample_smallest_model()
                 else:
                     (
                         local_model,
@@ -294,14 +299,14 @@ def main(args):
     if args.resume_ckpt:
         ckpt_path = args.resume_ckpt
         elastic_config = (
-            os.path.join(ckpt_path, "elastic.pt")
-            if os.path.exists(os.path.join(ckpt_path, "elastic.pt"))
-            else None
+            os.path.join(ckpt_path, "elastic_space.json")
+            if os.path.exists(os.path.join(ckpt_path, "elastic_space.json"))
+            else args.elastic_config
         )
 
     else:
         ckpt_path = model_name
-        elastic_config = None
+        elastic_config = args.elastic_config
 
     model = ViTForImageClassification.from_pretrained(
         ckpt_path,
@@ -310,19 +315,19 @@ def main(args):
         label2id={c: str(i) for i, c in enumerate(labels)},
         ignore_mismatched_sizes=True,
     )
-    if args.peft:
-        config = LoraConfig(
-            r=16,
-            lora_alpha=16,
-            target_modules=["query", "key", "value"],
-            lora_dropout=0.1,
-            bias="none",
-            modules_to_save=["classifier"],
-        )
-        print(f"[Warning]: default PEFT method LoRA, default configure:", config)
+    # if args.peft:
+    #     config = LoraConfig(
+    #         r=16,
+    #         lora_alpha=16,
+    #         target_modules=["query", "key", "value"],
+    #         lora_dropout=0.1,
+    #         bias="none",
+    #         modules_to_save=["classifier"],
+    #     )
+    #     print(f"[Warning]: default PEFT method LoRA, default configure:", config)
 
-        model = get_peft_model(model, config)
-        model.print_trainable_parameters()
+    #     model = get_peft_model(model, config)
+    #     model.print_trainable_parameters()
 
     global_model = RaFFM(model.to("cpu"), elastic_config)
     global_model = federated_learning(
