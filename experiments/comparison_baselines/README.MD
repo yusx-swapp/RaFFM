@@ -48,9 +48,6 @@ model = VisionTransformer()
 # Then convert to baseline PriSM
 prism_model = VisionTransformer_Orth(model, model.blocks)
 
-# Then convert to baseline PriSM
-prism_model = VisionTransformer_Orth(model)
-
 #train your model here ....
 
 ```
