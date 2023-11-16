@@ -1,1 +1,1 @@
-from .deit import VisionTransformer
+from .deit import VisionTransformer, deit_small_patch16_224

@@ -57,12 +57,66 @@ prism_model = VisionTransformer_Orth(model)
 
 ## Experiment Details and Analysis
 
-We have conducted the experiments to optimize
+### Results
+
+Table 1 shows the reults compared with baselines. To optimize target FMs to target accuracy 95%, RaFFM outperform baselines with faster training speed, less communication cost, and less energy usage.
+
+<table>
+  <caption style="text-align: center;">Table 1. Comparison with baselines</caption>
+
+  <tr>
+    <th>Model</th>
+    <th>Method</th>
+    <th>Target Accuracy</th>
+    <th>Training Accel. / Round</th>
+    <th>Communication cost</th>
+    <th>Peak Energy Usage</th>
+  </tr>
+  <tr>
+    <td>ViT-base</td>
+    <td>Full-size FM</td>
+    <td>95%</td>
+    <td>1.00×</td>
+    <td>9.52GB</td>
+    <td>24kWh</td>
+  </tr>
+  <tr>
+    <td></td>
+    <td>PruneFL</td>
+    <td></td>
+    <td>0.85×</td>
+    <td>17.62GB</td>
+    <td>28kWh</td>
+  </tr>
+  <tr>
+    <td></td>
+    <td>PriSM</td>
+    <td></td>
+    <td>0.75×</td>
+    <td>10.92GB</td>
+    <td>32kWh</td>
+  </tr>
+  <tr>
+    <td></td>
+    <td>RaFFM</td>
+    <td></td>
+    <td>2.12×</td>
+    <td>5.31GB</td>
+    <td>4.42kWh</td>
+  </tr>
+</table>
+
+### Analysis
+
+We recognize and value the foundational work in resource-efficient FL represented by PruneFL and PriSM. However, due to the differences in objectives and model focus, RaFFM shows significantly superior in applying FMs to FL senarios.
+
 **Application Senarios**
 
-| Model    | Method       | Target Accuracy | Training Accel. / Round | Communication cost | Peak Energy Usage |
-| -------- | ------------ | --------------- | ----------------------- | ------------------ | ----------------- |
-| ViT-base | Full-size FM | 95%             | 1.00×                   | 9.52GB             | 24kWh             |
-|          | PruneFL      |                 | 0.85×                   | 17.62GB            | 28kWh             |
-|          | PriSM        |                 | 0.75×                   | 10.92GB            | 32kWh             |
-|          | RaFFM        |                 | 2.12×                   | 5.31GB             | 4.42kWh           |
+First comparison with baselines, we have different senarios. Baselines achieve training acceleration by **zero-masking** partial parameters. This can accelerate training only in **paralell devices like GPUs**. In contrast, RaFFM directly operates on model architecture, accelerate on both **paralell devices and end-user devices**.
+
+**Optimization Objectives**
+
+Baseline method focus on train a large model in FL senarios only, and didn't consider the pre-trained knowledge in FMs. Masking out part of the weights without certain stratedy will destroy the pre-trained knowledge in FMs. In constrast, RaFFM with specialized model compression algorithm can retain such knowledge, and faster convergence (with only 5.31GB communication cost!).
+
+**Post-FL**
+Additionally, RaFFM considers post-FL model deployment, which enables heterogeneous model deployment post-federated learning without further training. (See experiment in [**post_training_deployment**](../post_training_deployment/README.MD))
