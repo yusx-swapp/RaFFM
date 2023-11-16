@@ -6,7 +6,7 @@ import math
 import torch
 import torch.nn as nn
 
-from model.deit import Block, Attention, VisionTransformer
+from .model.deit import Block, Attention, VisionTransformer
 from timm.models.layers import PatchEmbed, Mlp
 
 
