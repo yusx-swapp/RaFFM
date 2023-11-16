@@ -35,9 +35,52 @@ Detailed instructions and hyperparameters please refer our tutorial **[salient_p
 
 ## Results
 
-| Model    | Method       | Cifar10  |        | Cifar100 |        | Flower102 |        |
-| -------- | ------------ | -------- | ------ | -------- | ------ | --------- | ------ |
-|          |              | Accuracy | F1     | Accuracy | F1     | Accuracy  | F1     |
-| ViT-base | Original FM  | 96.70%   | 96.26% | 84.50%   | 84.30% | 98.20%    | 97.85% |
-|          | Pruning-Rank | 48.82%   | 46.53% | 15.40%   | 14.88% | 55.60%    | 54.70% |
-|          | RaFFM SPP    | 96.78%   | 96.53% | 85.20%   | 85.00% | 98.50%    | 98.10% |
+Comparison with Standard Pruning-Based Weights Ranking
+
+<table>
+  <caption>Table 1. Comparison of Model Performance With SPP</caption>
+
+  <tr>
+    <th rowspan="2">Model</th>
+    <th rowspan="2">Method</th>
+    <th colspan="2">Cifar10</th>
+    <th colspan="2">Cifar100</th>
+    <th colspan="2">Flower102</th>
+  </tr>
+  <tr>
+    <th>Accuracy</th>
+    <th>F1</th>
+    <th>Accuracy</th>
+    <th>F1</th>
+    <th>Accuracy</th>
+    <th>F1</th>
+  </tr>
+  <tr>
+    <td rowspan="3">ViT-base</td>
+    <td>Original FM</td>
+    <td>96.70%</td>
+    <td>96.26%</td>
+    <td>84.50%</td>
+    <td>84.30%</td>
+    <td>98.20%</td>
+    <td>97.85%</td>
+  </tr>
+  <tr>
+    <td>Pruning-Rank</td>
+    <td>48.82%</td>
+    <td>46.53%</td>
+    <td>15.40%</td>
+    <td>14.88%</td>
+    <td>55.60%</td>
+    <td>54.70%</td>
+  </tr>
+  <tr>
+    <td>RaFFM SPP</td>
+    <td>96.78%</td>
+    <td>96.53%</td>
+    <td>85.20%</td>
+    <td>85.00%</td>
+    <td>98.50%</td>
+    <td>98.10%</td>
+  </tr>
+</table>
