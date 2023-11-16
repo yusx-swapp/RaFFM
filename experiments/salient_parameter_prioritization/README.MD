@@ -35,10 +35,10 @@ Detailed instructions and hyperparameters please refer our tutorial **[salient_p
 
 ## Results
 
-Comparison with Standard Pruning-Based Weights Ranking
+We compare the ViT prioritized by RaFFM with **standard pruning-based rank** and **original ViT**.
 
 <table>
-  <center><caption>Table 1. Comparison of Model Performance With SPP</caption></center>
+  <caption style="text-align: center;">Table 1. Comparison of Model Performance With SPP</caption>
 
   <tr>
     <th rowspan="2">Model</th>
@@ -84,3 +84,23 @@ Comparison with Standard Pruning-Based Weights Ranking
     <td>98.10%</td>
   </tr>
 </table>
+
+The comparison results is shown in Table 1.
+
+The experimental results shows:
+
+- Standard pruning based SPP will destroy the pre-trained knowledge captured by the attention mechanism of FMs
+
+- RaFFM SPP preserves the pre-trained knowledge in FMs, leading to better model performance and faster learning convergence
+
+- FMs applied RaFFM’s Specialized SPP produces competitive performance as original FMs
+
+Further more we conducted ablation studies.
+In FL senarios, RaFFM equiped with SPP significantly improve the performance versus original FM (not apply SPP). The results is shown in Figure 1 and 2.
+
+| ![Performance vs Params](./figures/spp_vs_nospp.png) | ![ViT Performance vs Params](./figures/rounds_vs_accuracy.png) |
+| :--------------------------------------------------: | :------------------------------------------------------------: |
+|           Fig.1 - Local model performance            |                  Fig.2 - Training stableness                   |
+
+The experiment is conducted on BERT-Large with SST-2.
+RaFFM leverages the salient parameter prioritization component to identify impactful weights in FMs. Figure 1 box plot shows the local sub-model performance range for randomly sampled 100 clients from supernet with the same resource constraints. Figure 2 shows the communication rounds vs model accuracy. It's evident that SPP have positive impact on FL process, and produced higher model performance and a more stable learning trend.
