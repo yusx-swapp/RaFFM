@@ -38,7 +38,7 @@ Detailed instructions and hyperparameters please refer our tutorial **[salient_p
 Comparison with Standard Pruning-Based Weights Ranking
 
 <table>
-  <caption>Table 1. Comparison of Model Performance With SPP</caption>
+  <center><caption>Table 1. Comparison of Model Performance With SPP</caption></center>
 
   <tr>
     <th rowspan="2">Model</th>
