@@ -1,1 +1,1 @@
-from .prism import VisionTransformer_Orth
+from .prism import VisionTransformer_Orth, VisionTransformer

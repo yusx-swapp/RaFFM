@@ -40,11 +40,13 @@ You can also reproduce the baseline reults in your own senarios.
 For instance, converts a ViT to PriSM model:
 
 ```python
-import timm
-from PriSM import VisionTransformer_Orth
+from PriSM import VisionTransformer_Orth, VisionTransformer
 
-# First define a ViT from timm
-model = timm.create_model('vit_base_patch16_224.augreg2_in21k_ft_in1k', pretrained=True)
+# First define a ViT
+model = VisionTransformer()
+
+# Then convert to baseline PriSM
+prism_model = VisionTransformer_Orth(model, model.blocks)
 
 # Then convert to baseline PriSM
 prism_model = VisionTransformer_Orth(model)
