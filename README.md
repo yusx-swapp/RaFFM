@@ -15,6 +15,7 @@ _Bridging the Gap Between Foundation Models and Heterogeneous Federated Learning
 - [x] [11/10/2023] Experiments - Comparison with baselines
 - [x] [11/12/2023] Experiments - Post-federated learning model deployment
 - [x] [11/12/2023] Scripts for GLUE benchmark
+- [x] [11/16/2023] Experiments - Effectiveness of Salient Parameter Prioritization
 
 ## Installation
 
