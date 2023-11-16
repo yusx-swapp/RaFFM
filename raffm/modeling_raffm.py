@@ -100,7 +100,7 @@ class RaFFM:
         save_dict_to_file(self.elastic_config, os.path.join(dir, "elastic_space.json"))
 
     def load_ckpt(self, dir):
-        self.model.from_pretrained(dir)
+        self.model = self.model.from_pretrained(dir)
 
         if os.path.exists(os.path.join(dir, "elastic_space.json")):
             self.elastic_config = load_dict_from_file(
