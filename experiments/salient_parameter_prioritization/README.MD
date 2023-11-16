@@ -34,3 +34,12 @@ We first perform the parameter prioritization use different method, and then com
 Detailed instructions and hyperparameters please refer our tutorial **[salient_parameter_prioritization](./salient_parameter_prioritization.ipynb)**, where we have detailed instruction and high level APIs to reproduce our experiments.
 
 ## Results
+
+| Model    | Method       | Cifar10  |        | Cifar100 |        | Flower102 |        |
+| -------- | ------------ | -------- | ------ | -------- | ------ | --------- | ------ |
+|          |              | Accuracy | F1     | Accuracy | F1     | Accuracy  | F1     |
+| ViT-base | Original FM  | 96.70%   | 96.26% | 84.50%   | 84.30% | 98.20%    | 97.85% |
+|          | Pruning-Rank | 48.82%   | 46.53% | 15.40%   | 14.88% | 55.60%    | 54.70% |
+|          | RaFFM SPP    | 96.78%   | 96.53% | 85.20%   | 85.00% | 98.50%    | 98.10% |
+
+|
