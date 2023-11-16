@@ -25,8 +25,8 @@ class RaFFM:
         if not elastic_config:
             # set defalt search space configuration (this is defalt setting for bert)
             elastic_config = {
-                "atten_out_space": [768 - i * 12 for i in range(0, 15)],
-                # "atten_out_space": [768],
+                # "atten_out_space": [768 - i * 12 for i in range(0, 15)],
+                "atten_out_space": [768],
                 "inter_hidden_space": [3072 - i * 64 for i in range(0, 20)],
                 "out_hidden_space": [768 - i * 24 for i in range(0, 15)],
             }

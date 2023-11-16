@@ -55,11 +55,10 @@ def count_non_zero_params(model) -> int:
 
 @staticmethod
 def calculate_params(model):
-    """calculate the number of trainable parameters in the model
+    """calculate the number of parameters in the model
     Args:
         model: the model to be evaluated
     Returns:
-        total_trainable_params: the number of trainable parameters in the model
         total_params: the number of parameters in the model
         percentage: the percentage of trainable parameters in the model
     """

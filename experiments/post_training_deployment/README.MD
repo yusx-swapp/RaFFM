@@ -4,9 +4,11 @@
 
 In this experiment we show:
 
-**Post federated training, FMs trained by our method is scalable, and we can generate surprisingly large number of scaled FMs (> $10^{10}$) with out further training**
+**Post federated training, FMs trained by RaFFM is scalable, and we can generate surprisingly large number of scaled FMs (> $10^{10}$) with out further training**
 
-Such scaled FMs can fit different resource-constraints at the edge while maintaining the same level of accuracy.
+Most importantly, such scaled FMs are **high-performance**, which can fit different resource-constraints at the edge.
+
+This is very important in FL, that means for a newly join client with resource constraint, RaFFM can quickly deploy a high-performance model to it without additional training
 
 ## Reproduce the Experiments
 
@@ -21,6 +23,14 @@ conda install pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch -c nvi
 pip install -r requirements.txt
 ```
 
+### Download the scalable FM checkpoints
+
+We provide resource-aware FMs checkpoints trained via FL. You can download here:
+
+- [ViT-base CIFAR-100 _large-budget_](https://iowastate-my.sharepoint.com/:f:/g/personal/yusx_iastate_edu/El-nYhaOiINOoLHXsqqXqAkBOUEc_ohu-gGK0ms8neEFDQ) [Trained on *Large-budget* system heterogeneity edge-FL with 100 clients]
+- [ViT-base CIFAR-10 _large-budget_](https://iowastate-my.sharepoint.com/:f:/g/personal/yusx_iastate_edu/EkAE4V6VyO1JnpN9j-0QznUBjtREcIVttgVL9sjeP7mfvA) [Trained on *Large-budget* system heterogeneity edge-FL with 100 clients]
+- [ViT-base CIFAR-10 _small-budget_](https://iowastate-my.sharepoint.com/:u:/g/personal/yusx_iastate_edu/EYVquHHGqFBLlwZpSrfVTUYBJDcOCvD3Cw2AWk3BdseWjQ) [Trained on *Small-budget* system heterogeneity edge-FL with 100 clients]
+
 ### Run the Experiments
 
 We provide a Jupyter Notebook Tutorial **[post_training_deployment.ipynb](./post_training_deployment.ipynb)** with detailed instruction and high level APIs to reproduce our experiments.
@@ -32,5 +42,9 @@ We have some simple meta results shown on the tutorial: **[post_training_deploym
 | ![Performance vs Params](./figures/RoBERTa_performance_vs_params.png) | ![ViT Performance vs Params](./figures/vit_performance_vs_params.png) |
 | :-------------------------------------------------------------------: | :-------------------------------------------------------------------: |
 |                   Fig.1 - Scalable RoBERTa on SST-2                   |                    Fig.2 - Scalable ViT on CIFAR10                    |
+
+Figure 1 shows the trained RoBERTa on SST-2 dataset, we sample resource-aware scaled submodel in different size, and evaluate without further training, all submodels get the same level of accuracy.
+
+Similarlly, in Figure 2, we show the trained scalable ViT's performance on CIFAR-10, notebally, with half of the parameter scaled out, submodels with 45M parameters (75% FLOPs reduction) achieves 94.5% accuracy without further training.
 
 In summry, Foundation Models trained by RaFFM are scalable, which can enables heterogeneous model deployment post-federated learning without further training.
