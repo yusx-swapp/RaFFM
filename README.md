@@ -1,8 +1,8 @@
-# Resource-aware Federated Foundation Models (RaFFM): Bridging the Gap Between Foundation Models and Heterogeneous Federated Learning ([paper](https://arxiv.org/pdf/2310.00247.pdf))
+# Resource-aware Federated Foundation Models (RaFFM): Bridging the Gap Between Foundation Models and Heterogeneous Federated Learning
 
 This is the official implementation for the paper:
 
-_Bridging the Gap Between Foundation Models and Heterogeneous Federated Learning_ ([**paper**](https://arxiv.org/pdf/2310.00247.pdf))
+_Bridging the Gap Between Foundation Models and Heterogeneous Federated Learning_
 
 ## Updates
 
@@ -107,7 +107,7 @@ please see [EDGE-FL.md](TRAINING.md) for detailed training instructions.
 
 ## Contact
 
-Sixing Yu: <yusx@iastate.edu>
+anonymous
 
 ## TODO
 
@@ -130,16 +130,9 @@ Sixing Yu: <yusx@iastate.edu>
 If you find our work is helpful, please kindly support our efforts by citing our paper:
 
 ```
-@misc{yu2023raffm,
-      title={Bridging the Gap Between Foundation Models and Heterogeneous Federated Learning},
-      author={Sixing Yu and J. Pablo Muñoz and Ali Jannesari},
-      year={2023},
-      eprint={2310.00247},
-      archivePrefix={arXiv},
-      primaryClass={cs.LG}
-}
+under review
 ```
 
 ## Acknowledgement
 
-The experiments of this work is supported by **SHF CloudBank** and **Intel Labs ISL-cluster**.
+The experiments of this work is sponsored by **[anonymous institution]** and **[anonymous institution]**.
