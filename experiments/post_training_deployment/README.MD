@@ -29,16 +29,8 @@ We provide a Jupyter Notebook Tutorial **[post_training_deployment.ipynb](./post
 
 We have some simple meta results shown on the tutorial: **[post_training_deployment.ipynb](./post_training_deployment.ipynb)**
 
-<div style="display:flex; justify-content:space-around;">
-
-<figure>
-    <img src="./figures/RoBERTa_performance_vs_params.png" alt="Performance vs Params">
-    <center><figcaption>Fig.1 Scalable RoBERTa on SST-2</figcaption></center>
-</figure>
-<figure>
-    <img src="./figures/vit_performance_vs_params.png" alt="ViT Performance vs Params">
-    <center><figcaption>Fig.2 Scalable ViT on CIFAR-10.</figcaption></center>
-</figure>
-</div>
+| ![Performance vs Params](./figures/RoBERTa_performance_vs_params.png) | ![ViT Performance vs Params](./figures/vit_performance_vs_params.png) |
+| :-------------------------------------------------------------------: | :-------------------------------------------------------------------: |
+|                   Fig.1 - Scalable RoBERTa on SST-2                   |                    Fig.2 - Scalable ViT on CIFAR10                    |
 
 In summry, Foundation Models trained by RaFFM are scalable, which can enables heterogeneous model deployment post-federated learning without further training.
