@@ -14,7 +14,7 @@ from transformers import (
     Trainer,
 )
 from arguments import arguments
-from utils import DatasetSplitter, step_lr, EarlyStopping, calculate_params
+from utils import DatasetSplitter, step_lr, EarlyStopping, calculate_params, aggregate
 from PriSM import VisionTransformer_Orth, VisionTransformer
 
 
@@ -136,7 +136,7 @@ def federated_learning(
         print(
             f"Communication round {round} federated learning finished. \n Average trainable parameters:{avg_trainable_params}.\n Eval global model."
         )
-        global_model.aggregate(local_models)
+        aggregate(global_model, local_models)
 
         training_args = TrainingArguments(
             output_dir=os.path.join(args.save_dir, "global"),
@@ -305,7 +305,7 @@ def main(args):
     global_model = federated_learning(
         args, global_model, local_datasets, prepared_ds["validation"]
     )
-    global_model.save_ckpt(os.path.join(args.save_dir, args.dataset, "final"))
+    # global_model.save_ckpt(os.path.join(args.save_dir, args.dataset, "final"))
 
 
 if __name__ == "__main__":

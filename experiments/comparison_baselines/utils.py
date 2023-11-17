@@ -5,6 +5,27 @@ from datasets import Dataset
 import json
 
 
+def aggregate(global_model, local_models):
+    """Aggregate local weights via fedavg
+
+    Args:
+        local_models (_type_): _description_
+    """
+    global_model.to("cpu")
+    with torch.no_grad():
+        for name, param in global_model.named_parameters():
+            if param.requires_grad:
+                param *= 0
+                for local_model in local_models:
+                    local_param = local_model.state_dict()[name].cpu()
+                    if len(local_param.shape) == 2:
+                        param[
+                            : local_param.shape[0], : local_param.shape[1]
+                        ] += local_param / len(local_models)
+                    else:
+                        param[: local_param.shape[0]] += local_param / len(local_models)
+
+
 @staticmethod
 def save_dict_to_file(dictionary, file_path):
     """
