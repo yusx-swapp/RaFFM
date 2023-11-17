@@ -14,9 +14,8 @@ from transformers import (
     Trainer,
 )
 from arguments import arguments
-
-import timm
-from PriSM import VisionTransformer_Orth
+from utils import DatasetSplitter, step_lr, EarlyStopping, calculate_params
+from PriSM import VisionTransformer_Orth, VisionTransformer
 
 
 # @staticmethod
@@ -38,7 +37,7 @@ def compute_metrics(eval_pred):
 
 
 def federated_learning(
-    args, global_model: RaFFM, local_datasets, val_dataset, test_dataset=None
+    args, global_model, local_datasets, val_dataset, test_dataset=None
 ):
     early_stopping = EarlyStopping(patience=5, verbose=True)
 
@@ -58,9 +57,7 @@ def federated_learning(
             replace=False,
         )
 
-        if args.spp:
-            global_model.salient_parameter_prioritization()
-        avg_trainable_params = 0
+        # avg_trainable_params = 0
         processor = ViTImageProcessor.from_pretrained("google/vit-base-patch16-224")
         # Train the model on each client's dataset
         # for local_dataloader in local_dataloaders:
@@ -68,25 +65,8 @@ def federated_learning(
             local_dataset = local_datasets[client_id]
             print(f"Training client {client_id} in communication round {round}")
 
-            if args.method == "raffm":
-                if idx == 0:
-                    local_model = copy.deepcopy(global_model.model)
-                    local_model_params = global_model.total_params
-                elif idx == 1:
-                    (
-                        local_model,
-                        local_model_params,
-                        arc_config,
-                    ) = global_model.sample_smallest_model()
-                else:
-                    (
-                        local_model,
-                        local_model_params,
-                        arc_config,
-                    ) = global_model.random_resource_aware_model()
-            elif args.method == "vanilla":
-                local_model = copy.deepcopy(global_model.model)
-                local_model_params = global_model.total_params
+            local_model = copy.deepcopy(global_model)
+            local_model_params = calculate_params(local_model)
 
             avg_trainable_params += local_model_params
 
@@ -105,16 +85,11 @@ def federated_learning(
                 evaluation_strategy="no",
                 save_strategy="no",
                 num_train_epochs=args.num_local_epochs,
-                # save_steps=100,
-                # eval_steps=100,
-                # logging_steps=10,
                 learning_rate=lr,
-                # save_total_limit=2,
                 remove_unused_columns=False,
                 push_to_hub=False,
                 report_to="none",
                 label_names=["labels"],
-                # load_best_model_at_end=True,
             )
 
             trainer = Trainer(
@@ -170,20 +145,15 @@ def federated_learning(
             evaluation_strategy="no",
             save_strategy="no",
             num_train_epochs=args.num_local_epochs,
-            # save_steps=100,
-            # eval_steps=100,
-            # logging_steps=10,
             learning_rate=lr,
-            # save_total_limit=2,
             remove_unused_columns=False,
             push_to_hub=False,
             report_to="none",
             label_names=["labels"],
-            # load_best_model_at_end=True,
         )
 
         trainer = Trainer(
-            model=global_model.model,
+            model=global_model,
             args=training_args,
             data_collator=collate_fn,
             compute_metrics=compute_metrics,
@@ -328,8 +298,10 @@ def main(args):
 
     #     model = get_peft_model(model, config)
     #     model.print_trainable_parameters()
+    model = VisionTransformer()
 
-    global_model = RaFFM(model.to("cpu"), elastic_config)
+    # Then convert to baseline PriSM
+    global_model = VisionTransformer_Orth(model, model.blocks)
     global_model = federated_learning(
         args, global_model, local_datasets, prepared_ds["validation"]
     )
