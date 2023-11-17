@@ -9,60 +9,100 @@
 *
 ***************************************************************************************/
 """
-
+import copy
 import torch
 from torch import nn
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.sparse as sparse
-import torch.nn.init as init
-from torch.nn.parameter import Parameter
 
 
-def _sparse_masked_select_abs(module, sparse_tensor: sparse.FloatTensor, thr):
-    indices = sparse_tensor._indices()
-    values = sparse_tensor._values()
-    prune_mask = torch.abs(values) >= thr
-    return torch.sparse_coo_tensor(
-        indices=indices.masked_select(prune_mask).reshape(2, -1),
-        values=values.masked_select(prune_mask),
-        size=[module.out_features, module.in_features],
-    ).coalesce()
+def prune_by_threshold(module, threshold):
+    """
+    Prunes the weights of a neural network module by applying a threshold.
+
+    This function sets the weights of the module to zero if their absolute value
+    is less than the specified threshold, effectively pruning the module.
+
+    Parameters:
+    - module (nn.Module): The neural network module whose weights are to be pruned.
+    - threshold (float): The threshold value. Weights with an absolute value less than this are pruned.
+
+    Returns:
+    - float: The sparsity of the module after pruning, calculated as the proportion of weights that are zero.
+    """
+    mask = torch.abs(module.weight) > threshold
+    module.weight.data[~mask] = 0
+    module_sparsity = 1 - float(torch.sum(module.weight.data != 0)) / float(
+        module.weight.data.nelement()
+    )
+    return module_sparsity
 
 
-def prune_by_threshold(module, thr):
-    module.weight = Parameter(_sparse_masked_select_abs(module, module.weight, thr))
+def prune_by_rank(module, rank=0.8):
+    """
+    Prunes the weights of a neural network module based on a rank.
+
+    This function retains only a certain percentage of the top weights by their absolute value,
+    setting all other weights to zero. This helps in keeping only the most significant weights.
+
+    Parameters:
+    - module (nn.Module): The neural network module whose weights are to be pruned.
+    - rank (float): The percentage of weights to retain. Weights are ranked by their absolute values.
+
+    Returns:
+    - float: The sparsity of the module after pruning, calculated as the proportion of weights that are zero.
+    """
+
+    total_weights = module.weight.data.numel()
+    rank = int(total_weights * rank)
+    flat_weights = torch.abs(module.weight.data.view(-1))
+    threshold = torch.kthvalue(flat_weights, total_weights - rank).values.item()
+
+    # Create a mask where weights greater than the threshold are kept
+    mask = torch.abs(module.weight) > threshold
+
+    # Apply the mask to the weights, setting the others to zero
+    module.weight.data[~mask] = 0
+
+    # Calculate the sparsity (proportion of weights that are zero)
+    module_sparsity = 1 - float(torch.sum(module.weight.data != 0)) / float(
+        module.weight.data.nelement()
+    )
+
+    return module_sparsity
 
 
-def prune_by_rank(module, rank):
-    weight_val = module.weight._values()
-    sorted_abs_weight = torch.sort(torch.abs(weight_val))[0]
-    thr = sorted_abs_weight[rank]
-    prune_by_threshold(module, thr)
+def prunefl(model, rank=0.8, threshold=1e-2):
+    """
+    Applies pruning to a neural network model based on both threshold and rank.
 
+    This function iterates over all linear layers of the model and applies the prune_by_threshold
+    function to each layer. It creates and returns a copy of the model with pruned layers.
 
-def prune_by_pct(module, pct):
-    if pct == 0:
-        return
-    prune_idx = int(module.weight._nnz() * pct)
-    prune_by_rank(module, prune_idx)
+    Parameters:
+    - model (nn.Module): The neural network model to be pruned.
+    - threshold (float, optional): The threshold value for pruning. Default is 1e-2.
 
-
-def prunefl(model, threshold=1e-3):
+    Returns:
+    - nn.Module: A copy of the model with pruned layers.
+    - float: The average sparsity across all pruned layers in the model.
+    """
+    pruned_model = copy.deepcopy(model)
     # Prune all the conv layers of the model
     layer_wise_sparsity = []
     for name, module in model.named_modules():
-        if isinstance(module, nn.Conv2d):
-            mask = torch.abs(module.weight) > threshold
-            module.weight.data[~mask] = 0
-            module_sparsity = 1 - float(torch.sum(module.weight.data != 0)) / float(
-                module.weight.data.nelement()
-            )
+        if isinstance(
+            module, nn.Linear
+        ):  # Beacuse attention and dense layer are implement as Linear layer in Vit
+            if "dense" in name:
+                module_sparsity = prune_by_rank(module, rank)
+            else:
+                module_sparsity = prune_by_threshold(module, threshold)
             layer_wise_sparsity.append(module_sparsity)
             # print('Layer: {}, Sparsity: {:.2f}%'.format(name, module_sparsity*100))
 
     model_sparsity = np.mean(layer_wise_sparsity)
     # print('Model sparsity: {:.2f}%'.format(model_sparsity*100))
 
-    return model_sparsity
+    return pruned_model, model_sparsity
