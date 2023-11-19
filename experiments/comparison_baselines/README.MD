@@ -29,15 +29,37 @@ CUDA_VISIBLE_DEVICES=0 python prism_fl.py
 Similarly, to run the baselines **PruneLF** you can simply run the following commands:
 
 ```bash
-CUDA_VISIBLE_DEVICES=0 python prunefl_fl.py
+CUDA_VISIBLE_DEVICES=0 python prune_fl.py
 ```
 
 The full hyper-parameters lists and arguments can be find at **[`arguments.py`](arguments.py)**.
 
-### Low-level APIs
+### Low-level APIs for Baselines
 
-You can also reproduce the baseline reults in your own senarios.
-For instance, converts a ViT to PriSM model:
+We provide low-level API for you to reproduce our experiment results and run the baselines in your own senarios (such as end-users).
+
+For instance, to run the baseline PruneFL in your environments, you can use the API:
+
+```python
+from PruneFL import prunefl
+from transformers import ViTForImageClassification
+
+model = ViTForImageClassification.from_pretrained(
+    'google/vit-base-patch16-224-in21k',
+    num_labels=len(labels),
+    id2label={str(i): c for i, c in enumerate(labels)},
+    label2id={c: str(i) for i, c in enumerate(labels)},
+    ignore_mismatched_sizes=True,
+)
+
+#Prune the model
+pruned_model, model_sparsity = prunefl(global_model,rank=0.8, threshold=1e-2)
+
+#Train your model here ....
+
+```
+
+Similarly, you can use the low-level APIs to run PriSM, and converts a ViT to PriSM model:
 
 ```python
 from PriSM import VisionTransformer_Orth, VisionTransformer

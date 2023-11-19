@@ -47,7 +47,7 @@ def federated_learning(
     best_f1 = 0.0
 
     for round in range(args.num_rounds):
-        global_model, model_sparsity = prunefl(global_model)
+        global_model, model_sparsity = prunefl(global_model, rank=0.8, threshold=1e-2)
         print(
             f"Starting communication round {round}, the model sparsity  after pruning {model_sparsity}"
         )
