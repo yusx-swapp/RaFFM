@@ -27,9 +27,9 @@ pip install -r requirements.txt
 
 We provide resource-aware FMs checkpoints trained via FL. You can download here:
 
-- [ViT-base CIFAR-100 _large-budget_](https://iowastate-my.sharepoint.com/:f:/g/personal/yusx_iastate_edu/El-nYhaOiINOoLHXsqqXqAkBOUEc_ohu-gGK0ms8neEFDQ) [Trained on *Large-budget* system heterogeneity edge-FL with 100 clients]
-- [ViT-base CIFAR-10 _large-budget_](https://iowastate-my.sharepoint.com/:f:/g/personal/yusx_iastate_edu/EkAE4V6VyO1JnpN9j-0QznUBjtREcIVttgVL9sjeP7mfvA) [Trained on *Large-budget* system heterogeneity edge-FL with 100 clients]
-- [ViT-base CIFAR-10 _small-budget_](https://iowastate-my.sharepoint.com/:u:/g/personal/yusx_iastate_edu/EYVquHHGqFBLlwZpSrfVTUYBJDcOCvD3Cw2AWk3BdseWjQ) [Trained on *Small-budget* system heterogeneity edge-FL with 100 clients]
+- [ViT-base CIFAR-100 _large-budget_](https://drive.google.com/drive/folders/1QgGQf1UjAMW-P0L0beSZBSmlpZ5Tl_Gs?usp=sharing) [Trained on *Large-budget* system heterogeneity edge-FL with 100 clients]
+- [ViT-base CIFAR-10 _large-budget_](https://drive.google.com/drive/folders/1f4j3Q5nCDhgZp_SDEY-IQt8XE-lFSrrG?usp=sharing) [Trained on *Large-budget* system heterogeneity edge-FL with 100 clients]
+- [ViT-base CIFAR-10 _small-budget_](https://drive.google.com/drive/folders/1VgWU4cMB99IvGXhGpvaaTAFimPdE6KeS?usp=sharing) [Trained on *Small-budget* system heterogeneity edge-FL with 100 clients]
 
 ### Run the Experiments
 
