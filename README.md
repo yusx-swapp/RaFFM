@@ -34,9 +34,9 @@ RaFFM enables **resource-aware foundation model deployments** in edge-FL based o
 
 We provide resource-aware FMs checkpoints trained via FL. You can download here:
 
-- [ViT-base CIFAR-100 _large-budget_](https://drive.google.com/drive/folders/1QgGQf1UjAMW-P0L0beSZBSmlpZ5Tl_Gs?usp=sharing) [Trained on *Large-budget* system heterogeneity edge-FL with 100 clients]
-- [ViT-base CIFAR-10 _large-budget_](https://drive.google.com/drive/folders/1f4j3Q5nCDhgZp_SDEY-IQt8XE-lFSrrG?usp=sharing) [Trained on *Large-budget* system heterogeneity edge-FL with 100 clients]
-- [ViT-base CIFAR-10 _small-budget_](https://drive.google.com/drive/folders/1VgWU4cMB99IvGXhGpvaaTAFimPdE6KeS?usp=sharing) [Trained on *Small-budget* system heterogeneity edge-FL with 100 clients]
+- [ViT-base CIFAR-100 _large-budget_](https://drive.google.com/drive/folders/1SnmA-K0etMGK8hLZVXJC0HNQbPbkPd0c?usp=sharing) [Trained on *Large-budget* system heterogeneity edge-FL with 100 clients]
+- [ViT-base CIFAR-10 _large-budget_](https://drive.google.com/drive/folders/1gd_RHZYX-YSYk56dO2oo8wqqSIUD41vb?usp=sharing) [Trained on *Large-budget* system heterogeneity edge-FL with 100 clients]
+- [ViT-base CIFAR-10 _small-budget_](https://drive.google.com/drive/folders/1_vOgDe8nj5NZ3fyBC3AaRfRsUGDbUAbH?usp=sharing) [Trained on *Small-budget* system heterogeneity edge-FL with 100 clients]
 
 ### Checkpoints Usage
 
