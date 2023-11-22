@@ -84,6 +84,11 @@ add_frob_decay( model, alpha=0.0002 )
 
 ```
 
+## TODOs
+
+- [ ] Provide Jupyter Notebook tutorials for reviewer run baseline methods
+- [x] Low-level APIs for baselines at edge
+
 ## Experiment settings
 
 **General settings:** 100 edge clients, 10% ramdonly participation clients in each rounds. All training hyper-parameters, e.g, learning rate and weight decay, are keep the same for each method.
