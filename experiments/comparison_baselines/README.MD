@@ -4,7 +4,8 @@
 
 We compare RaFFM with baseline:
 
-**PriSM (From official Implementation)**: Overcoming Resource Constraints in Federated Learning: Large Models Can Be Trained with only Weak Clients
+**PriSM (From official Implementation)**: Overcoming Resource Constraints in Federated Learning: Large Models Can Be Trained with only Weak Clients. **(Forked from [commits 04e2139
+](https://github.com/yuehniu/modeldecomp-fl/tree/04e213968afd2dc7ae4097f8bc1d33b8bdb66ee2))**
 
 [PriSM Official Implementation](https://github.com/yuehniu/modeldecomp-fl/tree/master)
 
@@ -62,7 +63,7 @@ pruned_model, model_sparsity = prunefl(global_model,rank=0.8, threshold=1e-2)
 Similarly, you can use the low-level APIs to run PriSM, and converts a ViT to PriSM model:
 
 ```python
-from PriSM import VisionTransformer_Orth, VisionTransformer, convert_to_orth_model,deit_tiny_patch16_224
+from PriSM import VisionTransformer_Orth, VisionTransformer, convert_to_orth_model, deit_tiny_patch16_224
 
 # First define a ViT
 model = VisionTransformer()
