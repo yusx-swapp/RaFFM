@@ -1,0 +1,10 @@
+scikit-learn
+pyyaml
+ipykernel
+transformers
+transformers[torch]
+tensorboard
+evaluate
+datasets
+peft
+timm
