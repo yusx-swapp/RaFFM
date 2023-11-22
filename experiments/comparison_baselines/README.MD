@@ -17,14 +17,6 @@ We compare RaFFM with baseline:
 
 We thanks for the excellence of the baseline work and their great efforts. Despite these differences in objectives and model focus, **we recognize and value the foundational work in resource-efficient FL represented by PruneFL and PriSM**. These methods have provided essential insights and laid the groundwork for advancements like RaFFM, which aim to further enhance efficiency and scalability in FL.
 
-## Experiment settings
-
-**General settings:** 100 edge clients, 10% ramdonly participation clients in each rounds. All training hyper-parameters, e.g, learning rate and weight decay, are keep the same for each method.
-
-**PruneFL:** Pruning rank=0.8 (in each hidden layer, 20% of low-rank channels parameters been removed); Pruning threshold=1e-2, individual saliency less than 1e-2 been zero masked.
-
-**PriSM:** keep=0.8, keep 80% channels; fl=True, create model for fl training.
-
 ## Reproduce experiments
 
 We provide simulation scripts for you to quickly verify our experiments.
@@ -88,6 +80,14 @@ prism_model = VisionTransformer_Orth(model, blocks_orth)
 #train your model here ....
 
 ```
+
+## Experiment settings
+
+**General settings:** 100 edge clients, 10% ramdonly participation clients in each rounds. All training hyper-parameters, e.g, learning rate and weight decay, are keep the same for each method.
+
+**PruneFL:** Pruning rank=0.8 (in each hidden layer, 20% of low-rank channels parameters been removed); Pruning threshold=1e-2, individual saliency less than 1e-2 been zero masked.
+
+**PriSM:** keep=0.8, keep 80% channels; fl=True, create model for fl training.
 
 ## Experiment Details and Analysis
 
