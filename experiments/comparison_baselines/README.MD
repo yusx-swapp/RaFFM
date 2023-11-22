@@ -62,11 +62,15 @@ pruned_model, model_sparsity = prunefl(global_model,rank=0.8, threshold=1e-2)
 Similarly, you can use the low-level APIs to run PriSM, and converts a ViT to PriSM model:
 
 ```python
-from PriSM import VisionTransformer_Orth, VisionTransformer, convert_to_orth_model
+from PriSM import VisionTransformer_Orth, VisionTransformer, convert_to_orth_model,deit_tiny_patch16_224
 
 # First define a ViT
 model = VisionTransformer()
 
+'''
+Model used in their official implementation
+model = deit_tiny_patch16_224('deit_tiny',pretrained=True,img_size=32,num_classes=10,patch_size=4)
+'''
 
 # Then convert to baseline PriSM
 blocks_orth = convert_to_orth_model( model.blocks, keep=0.8, fl=True )# keep: channel keep ratio; fl: whether create model for fl or centralized training
