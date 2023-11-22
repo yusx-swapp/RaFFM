@@ -4,7 +4,13 @@ import torch
 import numpy as np
 from arguments import arguments
 from utils import DatasetSplitter, step_lr, EarlyStopping, calculate_params, aggregate
-from PriSM import VisionTransformer_Orth, VisionTransformer
+from PriSM import (
+    VisionTransformer_Orth,
+    VisionTransformer,
+    convert_to_orth_model,
+    deit_tiny_patch16_224,
+    add_frob_decay,
+)
 
 import os
 import time
@@ -27,8 +33,6 @@ from utils import (
     EarlyStopping,
 )
 import random
-
-from raffm import RaFFM
 
 
 class DatasetSplitter:
@@ -139,11 +143,19 @@ def initialize_model(model_name, num_classes, feature_extract, use_pretrained=Tr
 
     elif model_name == "vit":
         # model_ft = timm.create_model("vit_base_patch16_224", pretrained=use_pretrained, num_classes=num_classes)
-        model_ft = ViTForImageClassification.from_pretrained(
-            "google/vit-base-patch16-224",
-            num_labels=num_classes,
-            ignore_mismatched_sizes=True,
+        # model_ft = ViTForImageClassification.from_pretrained(
+        #     "google/vit-base-patch16-224",
+        #     num_labels=num_classes,
+        #     ignore_mismatched_sizes=True,
+        # )
+        model = deit_tiny_patch16_224(
+            "deit_tiny", pretrained=True, img_size=32, num_classes=10, patch_size=4
         )
+        # Then convert to baseline PriSM
+        blocks_orth = convert_to_orth_model(
+            model.blocks, keep=0.8, fl=True
+        )  # keep: channel keep ratio; fl: whether create model for fl or centralized training
+        prism_model = VisionTransformer_Orth(model, blocks_orth)
 
         # set_parameter_requires_grad(model_ft, feature_extract, model_name)
     elif model_name == "vit-large":
@@ -230,7 +242,7 @@ def federated_learning(
 ):
     early_stopping = EarlyStopping(patience=5, verbose=True)
 
-    global_model = RaFFM(model.to("cpu"))
+    global_model = model
     best_acc = 0.0
     best_f1 = 0.0
     for round in range(args.num_rounds):
@@ -243,8 +255,8 @@ def federated_learning(
             size=int(0.1 * len(local_dataloaders)),
             replace=False,
         )
-        if args.spp:
-            global_model.salient_parameter_prioritization()
+        # if args.spp:
+        #     global_model.salient_parameter_prioritization()
 
         avg_trainable_params = 0
 
@@ -254,24 +266,13 @@ def federated_learning(
             local_dataloader = local_dataloaders[client_id]
             print(f"Training client {client_id} in communication round {round}")
 
-            if args.method == "raffm":
-                if idx == 0:
-                    local_model = copy.deepcopy(global_model.model)
-                    local_model_params = global_model.total_params
-
-                else:
-                    (
-                        local_model,
-                        local_model_params,
-                    ) = global_model.random_resource_aware_model()
-            elif args.method == "vanilla":
-                local_model = copy.deepcopy(global_model.model)
-                local_model_params = global_model.total_params
+            local_model = copy.deepcopy(global_model)
+            local_model_params = calculate_params(local_model)
 
             avg_trainable_params += local_model_params
 
             print(
-                f"Client {client_id} local model has {local_model_params} parameters out of {global_model.total_params} parameters in communication round {round}"
+                f"Client {client_id} local model has {local_model_params} parameters in communication round {round}"
             )
 
             local_model = local_model.to(device)
@@ -286,7 +287,10 @@ def federated_learning(
                     local_optimizer.zero_grad()
                     loss = local_model(inputs, labels=labels).loss
                     loss.backward()
+                    # add Frobenius decay after gradient is calculated
+                    add_frob_decay(model, alpha=0.0002)
                     local_optimizer.step()
+
                 lr_scheduler.step()
 
             print("Eval local model\n")
@@ -298,13 +302,13 @@ def federated_learning(
             local_models.append(local_model)
             print("Training finished!")
         print("Eval global model finished!")
-        global_model.aggregate(local_models)
-        val_accuracy, val_f1_score = eval(global_model.model, val_dataloader, device)
+        aggregate(global_model, local_models)
+        val_accuracy, val_f1_score = eval(global_model, val_dataloader, device)
 
-        global_model.model.to("cpu")
+        global_model.to("cpu")
         if val_accuracy > best_acc:
             best_acc = val_accuracy
-            global_model.model.save_pretrained(
+            global_model.save_pretrained(
                 os.path.join(args.save_dir, args.dataset, "best_model")
             )
         if val_f1_score > best_f1:
@@ -364,9 +368,7 @@ def main(args):
     global_model = federated_learning(
         args, model, train_dataloaders, val_dataloader, criterion, device="cuda"
     )
-    global_model.model.save_pretrained(
-        os.path.join(args.save_dir, args.dataset, "final")
-    )
+    global_model.save_pretrained(os.path.join(args.save_dir, args.dataset, "final"))
 
 
 if __name__ == "__main__":
