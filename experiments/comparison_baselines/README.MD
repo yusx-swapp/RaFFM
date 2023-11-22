@@ -21,7 +21,7 @@ We thanks for the excellence of the baseline work and their great efforts. Despi
 
 We provide simulation scripts for you to quickly verify our experiments.
 
-To run the baselines **PriSM** you can simply use the low-level APIs bellow:
+To run the baselines **PriSM** and **PruneFL** you can simply use the low-level APIs bellow:
 
 <!-- ```bash
 CUDA_VISIBLE_DEVICES=0 python prism_fl.py
