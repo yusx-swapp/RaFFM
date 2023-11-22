@@ -69,7 +69,7 @@ model = VisionTransformer()
 
 
 # Then convert to baseline PriSM
-blocks_orth = convert_to_orth_model( model.blocks, keep=0.8, fl=True )
+blocks_orth = convert_to_orth_model( model.blocks, keep=0.8, fl=True )# keep: channel keep ratio; fl: whether create model for fl or centralized training
 prism_model = VisionTransformer_Orth(model, blocks_orth)
 
 #train your model here ....
