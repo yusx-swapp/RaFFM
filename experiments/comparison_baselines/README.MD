@@ -20,9 +20,9 @@ We thanks for the excellence of the baseline work and their great efforts. Despi
 
 We provide simulation scripts for you to quickly verify our experiments.
 
-To run the baselines **PriSM** you can simply run the following commands:
+To run the baselines **PriSM** you can simply use the low-level APIs bellow:
 
-```bash
+<!-- ```bash
 CUDA_VISIBLE_DEVICES=0 python prism_fl.py
 ```
 
@@ -30,9 +30,9 @@ Similarly, to run the baselines **PruneLF** you can simply run the following com
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 python prune_fl.py
-```
+``` -->
 
-The full hyper-parameters lists and arguments can be find at **[`arguments.py`](arguments.py)**.
+<!-- The full hyper-parameters lists and arguments can be find at **[`arguments.py`](arguments.py)**. -->
 
 ### Low-level APIs for Baselines
 
