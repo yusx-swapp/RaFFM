@@ -4,7 +4,7 @@
 
 In this experiment we show:
 
-**Post federated training, FMs trained by RaFFM is scalable, and we can generate surprisingly large number of scaled FMs (> $10^{10}$) with out further training**
+**Post federated training, FMs trained by RaFFM is scalable, and we can generate surprisingly large number of scaled FMs (> $10^{10}$) without further training**
 
 Most importantly, such scaled FMs are **high-performance**, which can fit different resource-constraints at the edge.
 
