@@ -54,13 +54,20 @@ class RaFFM:
         """
 
         if "bert" == self.model.config.model_type.lower():
-            arc_config = arc_config_sampler(**self.elastic_config)
+            arc_config = arc_config_sampler(
+                **self.elastic_config, n_layer=self.model.config.num_hidden_layers
+            )
             subnetwork, total_params = bert_module_handler(self.model, arc_config)
         elif "vit" == self.model.config.model_type.lower():
-            arc_config = arc_config_sampler(**self.elastic_config)
+            arc_config = arc_config_sampler(
+                **self.elastic_config, n_layer=self.model.config.num_hidden_layers
+            )
             subnetwork, total_params = vit_module_handler(self.model, arc_config)
         elif "sam" == self.model.config.model_type.lower():
-            arc_config = arc_config_sampler(**self.elastic_config, n_layer=32)
+            arc_config = arc_config_sampler(
+                **self.elastic_config,
+                n_layer=self.model.vision_encoder.config.num_hidden_layers,
+            )
             subnetwork, total_params = sam_module_handler(self.model, arc_config)
         else:
             raise NotImplementedError
