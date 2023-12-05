@@ -9,6 +9,7 @@ from .model_scaling import (
     arc_config_sampler,
     vit_module_handler,
     vit_peft_module_handler,
+    sam_module_handler,
 )
 from .param_prioritization import *
 from .utils import calculate_params, save_dict_to_file, load_dict_from_file
@@ -56,6 +57,8 @@ class RaFFM:
             subnetwork, total_params = bert_module_handler(self.model, arc_config)
         elif "vit" == self.model.config.model_type.lower():
             subnetwork, total_params = vit_module_handler(self.model, arc_config)
+        elif "sam" == self.model.config.model_type.lower():
+            subnetwork, total_params = sam_module_handler(self.model, arc_config)
         else:
             raise NotImplementedError
         return subnetwork, total_params, arc_config
@@ -70,6 +73,8 @@ class RaFFM:
             return bert_module_handler(self.model, arc_config)
         elif "vit" == self.model.config.model_type.lower():
             return vit_module_handler(self.model, arc_config)
+        elif "sam" == self.model.config.model_type.lower():
+            return sam_module_handler(self.model, arc_config)
         else:
             raise NotImplementedError
 
