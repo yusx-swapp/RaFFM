@@ -120,8 +120,8 @@ anonymous
 - [x] Simulation scripts on GLUE
 - [x] ViT CIFAR-100 ckpts
 - [x] High level API for real edge-FL
-- [ ] API for segment anything (SAM)
-- [ ] Evaluate Scripts for resource-aware models
+- [x] API for segment anything (SAM)
+- [x] Evaluate Scripts for resource-aware models
 - [ ] BERT-large, FLAN-T5 ckpts
 - [ ] Simulation scripts on SQUAD
 - [ ] ONNX and TensorRT APIs for edge
