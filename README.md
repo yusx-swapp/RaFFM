@@ -81,9 +81,9 @@ print("subnetwork params",params)
 
 ## Train FMs on Heterogeneous Resource edge-FL
 
-RaFFM is able to scale down a given FMs based on edge resource constraints, and hence, enabling resource-aware federated learning.
+RaFFM is able to scale down a given FMs based on edge resource constraints, hence, enabling resource-aware federated learning.
 
-Here we provide scripts to reproduce the experimental results we reported in paper.
+Here we provide scripts to reproduce the experimental results we reported in the paper.
 
 ### Resource-aware ViT
 
@@ -95,14 +95,14 @@ python fl_vit.py --method raffm --spp --model vit --save_dir log/vit --dataset c
 
 To check the results, you can:
 
-- Check the output information from terminal console
+- Check the output information from the terminal console
 - Use tensorboard: `tensorboard --logdir log/vit`
 
 **[Note]**: More APIs and scripts will post, please check the [**Updates**](#updates).
 
 ## Training on Edge
 
-The above scripts is simulate on central device for reproducibility of RaFFM, if you want to deploy RaFFM on edge-FL:
+The above scripts are simulated on a central device for reproducibility of RaFFM, if you want to deploy RaFFM on edge-FL:
 
 please see [EDGE-FL.md](TRAINING.md) for detailed training instructions.
 
