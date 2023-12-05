@@ -52,12 +52,15 @@ class RaFFM:
         Returns:
             _type_: _description_
         """
-        arc_config = arc_config_sampler(**self.elastic_config)
+
         if "bert" == self.model.config.model_type.lower():
+            arc_config = arc_config_sampler(**self.elastic_config)
             subnetwork, total_params = bert_module_handler(self.model, arc_config)
         elif "vit" == self.model.config.model_type.lower():
+            arc_config = arc_config_sampler(**self.elastic_config)
             subnetwork, total_params = vit_module_handler(self.model, arc_config)
         elif "sam" == self.model.config.model_type.lower():
+            arc_config = arc_config_sampler(**self.elastic_config, n_layer=32)
             subnetwork, total_params = sam_module_handler(self.model, arc_config)
         else:
             raise NotImplementedError
