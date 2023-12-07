@@ -3,7 +3,6 @@ import time
 import numpy as np
 from datasets import load_dataset, concatenate_datasets
 import functools
-import evaluate
 from torch.utils.tensorboard import SummaryWriter
 import copy
 import argparse
@@ -26,23 +25,70 @@ from transformers import (
 from raffm.utils import DatasetSplitter, step_lr, EarlyStopping
 from raffm import RaFFM
 from arguments import arguments
+from scipy.stats import pearsonr
+from sklearn.metrics import accuracy_score, matthews_corrcoef
 
 
 @staticmethod
-def compute_metrics(p):
-    accuracy_metric = evaluate.load("accuracy")
-    f1_metric = evaluate.load("f1")
+# set no_deprecation_warning to True to avoid warning messages
+def compute_metrics(eval_pred, task):
+    predictions, labels = eval_pred
+    if task == "stsb":
+        pearson_corr, _ = pearsonr(predictions.squeeze(), labels)
+        return {"pearson_corr": pearson_corr}
+    elif task == "cola":
+        probabilities_class_1 = predictions[:, 1]
+        # Convert continuous predictions to binary (0 or 1) for the CoLA task
+        binary_predictions = (probabilities_class_1 > 0.5).astype(int)
+        return {"matthews_corr": matthews_corrcoef(labels, binary_predictions)}
+    else:
+        predictions = predictions.argmax(-1)
+        return {"accuracy": accuracy_score(labels, predictions)}
 
-    accuracy = accuracy_metric.compute(
-        predictions=np.argmax(p.predictions, axis=1), references=p.label_ids
-    )
-    f1 = f1_metric.compute(
-        predictions=np.argmax(p.predictions, axis=1),
-        references=p.label_ids,
-        average="weighted",
+
+def evaluate(args, global_model, tokenized_test_dataset):
+    # tokenized_test_dataset = test_dataset.map(lambda examples: tokenize_function(examples, tokenizer, args.dataset, args.model), batched=True)
+
+    training_args = TrainingArguments(
+        args.log_dir,
+        logging_dir=args.log_dir,
+        logging_steps=1000,
+        save_strategy="no",
+        evaluation_strategy="no",
     )
 
-    return {"accuracy": accuracy["accuracy"], "f1": f1["f1"]}
+    global_model.to("cuda")  # Move the global model to GPU memory for evaluation
+    # global_model = torch.compile(global_model)
+    trainer = Trainer(
+        model=global_model,
+        args=training_args,
+    )
+
+    predictions = trainer.predict(tokenized_test_dataset)
+    true_labels = tokenized_test_dataset["label"]
+    true_labels = np.array(tokenized_test_dataset["label"])
+
+    global_model.to("cpu")  # Move the global model back to CPU memory after evaluation
+
+    if args.dataset == "stsb":
+        pearson_corr = compute_metrics(
+            (predictions.predictions, true_labels), args.dataset
+        )["pearson_corr"]
+        print(f"Pearson correlation: {pearson_corr}")
+        return pearson_corr
+    elif args.dataset == "cola":
+        probabilities_class_1 = predictions.predictions[:, 1]
+        binary_predictions = (probabilities_class_1 > 0.5).astype(int)
+        matthews_corr = matthews_corrcoef(true_labels, binary_predictions)
+
+        print(f"matthews correlation: {matthews_corr}")
+        return matthews_corr
+
+    else:
+        predicted_labels = predictions.predictions.argmax(-1)
+        accuracy = accuracy_score(true_labels, predicted_labels)
+        print(f"Accuracy: {accuracy}")
+        return accuracy
 
 
 def federated_learning(
@@ -51,8 +97,7 @@ def federated_learning(
     early_stopping = EarlyStopping(patience=5, verbose=True)
 
     writer = SummaryWriter(os.path.join(args.save_dir, args.dataset))
-    best_acc = 0.0
-    best_f1 = 0.0
+    best_performance = 0.0
 
     for round in range(args.num_rounds):
         local_models = []
@@ -79,7 +124,12 @@ def federated_learning(
                 if idx == 0:
                     local_model = copy.deepcopy(global_model.model)
                     local_model_params = global_model.total_params
-
+                elif idx == 1:
+                    (
+                        local_model,
+                        local_model_params,
+                        arc_config,
+                    ) = global_model.sample_smallest_model()
                 else:
                     (
                         local_model,
@@ -100,29 +150,22 @@ def federated_learning(
                 local_model_params,
                 round,
             )
+
             training_args = TrainingArguments(
                 output_dir=os.path.join(args.save_dir, "clients", str(client_id)),
                 per_device_train_batch_size=args.batch_size,
                 per_device_eval_batch_size=args.batch_size,
                 evaluation_strategy="no",
                 save_strategy="no",
-                num_train_epochs=args.num_local_epochs,
-                # save_steps=100,
-                # eval_steps=100,
-                # logging_steps=10,
                 learning_rate=lr,
-                # save_total_limit=2,
-                remove_unused_columns=False,
-                push_to_hub=False,
+                num_train_epochs=args.num_local_epochs,
+                weight_decay=0.01,
                 report_to="none",
-                label_names=["labels"],
-                # load_best_model_at_end=True,
             )
-
             trainer = Trainer(
                 model=local_model,
                 args=training_args,
-                compute_metrics=compute_metrics,
+                compute_metrics=functools.partial(compute_metrics, task=args.dataset),
                 train_dataset=local_dataset,
                 eval_dataset=val_dataset,
             )
@@ -133,18 +176,11 @@ def federated_learning(
                 metrics = trainer.evaluate(val_dataset)
 
                 trainer.log_metrics("eval", metrics)
-                val_accuracy, val_f1_score = (
-                    metrics["eval_accuracy"],
-                    metrics["eval_f1"],
-                )
+                eval_performance = list(metrics.values())[0]
+
                 writer.add_scalar(
-                    str(client_id) + "/eval_accuracy",
-                    val_accuracy,
-                    round,
-                )
-                writer.add_scalar(
-                    str(client_id) + "/eval_f1",
-                    val_f1_score,
+                    str(client_id) + "/eval_performance",
+                    eval_performance,
                     round,
                 )
 
@@ -159,7 +195,7 @@ def federated_learning(
             round,
         )
         print(
-            f"Communication round {round} federated learning finished. \n Average trainable parameters:{avg_trainable_params}.\n Eval global model."
+            f"Communication round {round} federated learning finished. \n Average local model parameters:{avg_trainable_params}.\n Eval global model."
         )
         global_model.aggregate(local_models)
 
@@ -169,74 +205,53 @@ def federated_learning(
             per_device_eval_batch_size=args.batch_size,
             evaluation_strategy="no",
             save_strategy="no",
-            num_train_epochs=args.num_local_epochs,
-            # save_steps=100,
-            # eval_steps=100,
-            # logging_steps=10,
             learning_rate=lr,
-            # save_total_limit=2,
-            remove_unused_columns=False,
-            push_to_hub=False,
+            num_train_epochs=args.num_local_epochs,
+            weight_decay=0.01,
             report_to="none",
-            label_names=["labels"],
-            # load_best_model_at_end=True,
         )
-
         trainer = Trainer(
-            model=global_model.model,
+            model=local_model,
             args=training_args,
-            compute_metrics=compute_metrics,
+            compute_metrics=functools.partial(compute_metrics, task=args.dataset),
             train_dataset=local_dataset,
             eval_dataset=val_dataset,
         )
         metrics = trainer.evaluate(val_dataset)
         trainer.log_metrics("eval", metrics)
         trainer.save_metrics("eval", metrics)
-        val_accuracy, val_f1_score = metrics["eval_accuracy"], metrics["eval_f1"]
+
+        eval_performance = list(metrics.values())[0]
 
         writer.add_scalar(
-            "global/eval_accuracy",
-            val_accuracy,
-            round,
-        )
-        writer.add_scalar(
-            "global/eval_f1",
-            val_f1_score,
+            "global/eval_performance",
+            eval_performance,
             round,
         )
 
         global_model.model.to("cpu")
-        if val_accuracy > best_acc:
-            best_acc = val_accuracy
-            global_model.model.save_pretrained(
-                os.path.join(args.save_dir, args.dataset, "best_model")
-            )
-
+        if eval_performance > best_performance:
+            best_performance = eval_performance
             global_model.save_ckpt(
                 os.path.join(args.save_dir, args.dataset, "best_model")
             )
-        if val_f1_score > best_f1:
-            best_f1 = val_f1_score
+
         writer.add_scalar(
-            "global/best_accuracy",
-            best_acc,
-            round,
-        )
-        writer.add_scalar(
-            "global/best_f1",
-            best_f1,
+            "global/best_performance",
+            best_performance,
             round,
         )
 
-        print(f"Best Validation Accuracy: {best_acc:.4f}")
-        print(f"Best Validation F1 Score: {best_f1:.4f}")
+        print(
+            f"Best Validation Performance (Accuracy/Pearson Correlation/Matthews correlation coefficient): {best_performance:.4f}"
+        )
 
         if test_dataset:
             metrics = trainer.evaluate(test_dataset, metric_key_prefix="test")
-            trainer.log_metrics("eval", metrics)
-            trainer.save_metrics("eval", metrics)
+            trainer.log_metrics("test", metrics)
+            trainer.save_metrics("test", metrics)
 
-        early_stopping(val_f1_score)
+        early_stopping(eval_performance)
         if early_stopping.has_converged():
             print("Model has converged. Stopping training.")
             break
@@ -360,14 +375,14 @@ def main(args):
     if args.resume_ckpt:
         ckpt_path = args.resume_ckpt
         elastic_config = (
-            os.path.join(ckpt_path, "elastic.pt")
-            if os.path.exists(os.path.join(ckpt_path, "elastic.pt"))
-            else None
+            os.path.join(ckpt_path, "elastic_space.json")
+            if os.path.exists(os.path.join(ckpt_path, "elastic_space.json"))
+            else args.elastic_config
         )
 
     else:
         ckpt_path = model_name
-        elastic_config = None
+        elastic_config = args.elastic_config
 
     global_model = RaFFM(global_model.to("cpu"), elastic_config)
     global_model = federated_learning(

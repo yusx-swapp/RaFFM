@@ -210,9 +210,9 @@ def federated_learning(
         global_model.model.to("cpu")
         if val_accuracy > best_acc:
             best_acc = val_accuracy
-            global_model.model.save_pretrained(
-                os.path.join(args.save_dir, args.dataset, "best_model")
-            )
+            # global_model.model.save_pretrained(
+            #     os.path.join(args.save_dir, args.dataset, "best_model")
+            # )
 
             global_model.save_ckpt(
                 os.path.join(args.save_dir, args.dataset, "best_model")
@@ -235,8 +235,8 @@ def federated_learning(
 
         if test_dataset:
             metrics = trainer.evaluate(test_dataset, metric_key_prefix="test")
-            trainer.log_metrics("eval", metrics)
-            trainer.save_metrics("eval", metrics)
+            trainer.log_metrics("test", metrics)
+            trainer.save_metrics("test", metrics)
 
         early_stopping(val_f1_score)
         if early_stopping.has_converged():
