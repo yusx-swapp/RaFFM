@@ -31,6 +31,31 @@ Specifically, configuration of each systems are:
 - Large: 20% Dell XPS 15, 40% Jetson AGX Orin, 40% Nvidia V100s.
 - Xlarge: 10% Jetson AGX Orin, 90% Nvidia V100s.
 
+## Instant Power Usage for End-users
+
+We have conducted an evaluation of the instant power usage of RaFFM in various edge-FL system settings while optimizing the BERT-base model on the SST-2 dataset.
+
+Figure 2 depicts the instant energy usage of RaFFM across the Xsmall, Small, Medium, Large, and Xlarge system settings. The **_Energy Usage_** represented in the figure reflects the cumulative instant power usage of all 100 clients at certain time steps within one FL communication round.
+
+<figure>
+    <img src="./figures/instant_power_usage.png" alt="Alt text" style="width:100%">
+    <figcaption  style="text-align: center;">Fig.2 - Instant Engery Usage.</figcaption>
+</figure>
+
+Furthermore, we have summarized the peak energy usage for each edge system setting in Table 1 below.
+
+**Table 1. Peak Energy Usage at Edge System**
+
+| System Setting | Model     | Dataset | Peak Energy Usage |
+| -------------- | --------- | ------- | ----------------- |
+| Xsmall         | BERT-Base | SST-2   | 0.62 kWh          |
+| Small          | BERT-Base | SST-2   | 3.20 kWh          |
+| Medium         | BERT-Base | SST-2   | 7.34 kWh          |
+| Large          | BERT-Base | SST-2   | 16.28 kWh         |
+| Xlarge         | BERT-Base | SST-2   | 25.71 kWh         |
+
+**Note: The Peak Energy Usage values may exhibit slight variations from our author response due to deviations and potential device overclocking during the training process.**
+
 ## Hyper-parameter settings
 
 The hyper-parameter settings slightly varies for different FMs, in the `arguments.py` we have detailed hyper-parameter setting lists.

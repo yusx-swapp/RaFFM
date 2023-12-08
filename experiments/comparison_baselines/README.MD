@@ -4,7 +4,8 @@
 
 We compare RaFFM with baseline:
 
-**PriSM (From official Implementation)**: Overcoming Resource Constraints in Federated Learning: Large Models Can Be Trained with only Weak Clients
+**PriSM (From official Implementation)**: Overcoming Resource Constraints in Federated Learning: Large Models Can Be Trained with only Weak Clients. **(Forked from [commits 04e2139
+](https://github.com/yuehniu/modeldecomp-fl/tree/04e213968afd2dc7ae4097f8bc1d33b8bdb66ee2))**
 
 [PriSM Official Implementation](https://github.com/yuehniu/modeldecomp-fl/tree/master)
 
@@ -20,40 +21,81 @@ We thanks for the excellence of the baseline work and their great efforts. Despi
 
 We provide simulation scripts for you to quickly verify our experiments.
 
-To run the baselines **PriSM** you can simply run the following commands:
+To run the baselines **PriSM** and **PruneFL** you can simply use the low-level APIs bellow:
 
-```bash
+<!-- ```bash
 CUDA_VISIBLE_DEVICES=0 python prism_fl.py
 ```
 
 Similarly, to run the baselines **PruneLF** you can simply run the following commands:
 
 ```bash
-CUDA_VISIBLE_DEVICES=0 python prunefl_fl.py
-```
+CUDA_VISIBLE_DEVICES=0 python prune_fl.py
+``` -->
 
-The full hyper-parameters lists and arguments can be find at **[`arguments.py`](arguments.py)**.
+<!-- The full hyper-parameters lists and arguments can be find at **[`arguments.py`](arguments.py)**. -->
 
-### Low-level APIs
+### Low-level APIs for Baselines
 
-You can also reproduce the baseline reults in your own senarios.
-For instance, converts a ViT to PriSM model:
+We provide low-level API for you to reproduce our experiment results and run the baselines in your own senarios (such as end-users).
+
+For instance, to run the baseline PruneFL in your environments, you can use the API:
 
 ```python
-from PriSM import VisionTransformer_Orth, VisionTransformer
+from PruneFL import prunefl
+from transformers import ViTForImageClassification
+
+model = ViTForImageClassification.from_pretrained(
+    'google/vit-base-patch16-224-in21k',
+    num_labels=len(labels),
+    id2label={str(i): c for i, c in enumerate(labels)},
+    label2id={c: str(i) for i, c in enumerate(labels)},
+    ignore_mismatched_sizes=True,
+)
+
+#Prune the model
+pruned_model, model_sparsity = prunefl(global_model,rank=0.8, threshold=1e-2)
+
+#Train your model here ....
+
+```
+
+Similarly, you can use the low-level APIs to run PriSM, and converts a ViT to PriSM model:
+
+```python
+from PriSM import VisionTransformer_Orth, VisionTransformer, convert_to_orth_model, deit_tiny_patch16_224, add_frob_decay
 
 # First define a ViT
 model = VisionTransformer()
 
-# Then convert to baseline PriSM
-prism_model = VisionTransformer_Orth(model, model.blocks)
+'''
+Model used in their official implementation
+model = deit_tiny_patch16_224('deit_tiny',pretrained=True,img_size=32,num_classes=10,patch_size=4)
+'''
 
 # Then convert to baseline PriSM
-prism_model = VisionTransformer_Orth(model)
+blocks_orth = convert_to_orth_model( model.blocks, keep=0.8, fl=True )# keep: channel keep ratio; fl: whether create model for fl or centralized training
+prism_model = VisionTransformer_Orth(model, blocks_orth)
 
-#train your model here ....
+#Train your model here ....
+
+# In trainer, we add Frobenius decay
+add_frob_decay( model, alpha=0.0002 )
 
 ```
+
+## TODOs
+
+- [ ] Provide Jupyter Notebook tutorials for reviewer run baseline methods
+- [x] Low-level APIs for baselines at edge
+
+## Experiment settings
+
+**General settings:** 100 edge clients, 10% ramdonly participation clients in each rounds. All training hyper-parameters, e.g, learning rate and weight decay, are keep the same for each method.
+
+**PruneFL:** Pruning rank=0.8 (in each hidden layer, 20% of low-rank channels parameters been removed); Pruning threshold=1e-2, individual saliency less than 1e-2 been zero masked.
+
+**PriSM:** keep=0.8, keep 80% channels; fl=True, create model for fl training.
 
 ## Experiment Details and Analysis
 

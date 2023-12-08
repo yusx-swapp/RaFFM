@@ -15,6 +15,7 @@ __all__ = [
     "vit_module_handler",
     "vit_peft_module_handler",
     "arc_config_sampler",
+    "sam_module_handler",
 ]
 
 
@@ -221,9 +222,9 @@ def vit_module_handler(model, arc_config):
 
     subnetwork = copy.deepcopy(model).cpu()
 
-    bert_layers = subnetwork.vit.encoder.layer
+    vit_layers = subnetwork.vit.encoder.layer
 
-    for i, (layer, key) in enumerate(zip(bert_layers, arc_config)):
+    for i, (layer, key) in enumerate(zip(vit_layers, arc_config)):
         arc = arc_config[key]
         new_config = ViTConfig.from_dict(model.config.to_dict())
         # new_config.hidden_size = arc  # Set to the new output dimension
@@ -249,6 +250,103 @@ def vit_module_handler(model, arc_config):
     total_params = calculate_params(subnetwork)
 
     return subnetwork, total_params
+
+
+@staticmethod
+def sam_module_handler(model, arc_config):
+    from transformers.models.sam.modeling_sam import (
+        SamVisionAttention,
+        SamMLPBlock,
+        SamVisionLayer,
+    )
+    from transformers import SamVisionConfig
+
+    sub_model = copy.deepcopy(model).cpu()
+    vision_encoder = copy.deepcopy(sub_model.vision_encoder).cpu()
+
+    sam_vit_layers = vision_encoder.layers
+
+    class SamVisionAttention(SamVisionAttention):
+        def __init__(self, config, window_size):
+            import torch
+
+            super().__init__(config, window_size)
+            input_size = (
+                (
+                    config.image_size // config.patch_size,
+                    config.image_size // config.patch_size,
+                )
+                if window_size == 0
+                else (window_size, window_size)
+            )
+
+            self.num_attention_heads = config.num_attention_heads
+            # head_dim = config.hidden_size // config.num_attention_heads
+            head_dim = config.attention_head_size
+
+            self.scale = head_dim**-0.5
+            self.dropout = config.attention_dropout
+
+            self.qkv = nn.Linear(
+                config.hidden_size,
+                head_dim * self.num_attention_heads * 3,
+                bias=config.qkv_bias,
+            )
+            self.proj = nn.Linear(
+                head_dim * self.num_attention_heads, config.hidden_size
+            )
+
+            self.use_rel_pos = config.use_rel_pos
+            if self.use_rel_pos:
+                if input_size is None:
+                    raise ValueError(
+                        "Input size must be provided if using relative positional encoding."
+                    )
+
+                # initialize relative positional embeddings
+                self.rel_pos_h = nn.Parameter(
+                    torch.zeros(2 * input_size[0] - 1, head_dim)
+                )
+                self.rel_pos_w = nn.Parameter(
+                    torch.zeros(2 * input_size[1] - 1, head_dim)
+                )
+
+    class SamMLPBlock(SamMLPBlock):
+        def __init__(self, config):
+            super().__init__(config)
+
+            self.lin1 = nn.Linear(config.hidden_size, config.mlp_dim)
+            self.lin2 = nn.Linear(config.mlp_dim, config.hidden_size)
+
+    for i, (layer, key) in enumerate(zip(sam_vit_layers, arc_config)):
+        arc = arc_config[key]
+        new_config = SamVisionConfig.from_dict(vision_encoder.config.to_dict())
+
+        # new_config.hidden_size = arc  # Set to the new output dimension
+        new_config.attention_head_size = (
+            arc["atten_out"] // new_config.num_attention_heads
+        )  # Ensure it divides evenly
+
+        new_config.mlp_dim = arc["inter_hidden"]
+        new_attention_layer = SamVisionAttention(
+            config=new_config,
+            window_size=new_config.window_size
+            if i not in new_config.global_attn_indexes
+            else 0,
+        )
+
+        new_mlp = SamMLPBlock(config=new_config)
+
+        load_subnet_state_dict(new_attention_layer, layer.attn)
+        load_subnet_state_dict(new_mlp, layer.mlp)
+
+        layer.attn = new_attention_layer
+        layer.mlp = new_mlp
+
+    sub_model.vision_encoder = vision_encoder
+    total_params = calculate_params(sub_model)
+
+    return sub_model, total_params
 
 
 @staticmethod
@@ -302,9 +400,9 @@ def vit_peft_module_handler(model: PeftModel, peft_config: PeftConfig, arc_confi
 
     subnetwork = copy.deepcopy(model).cpu()
 
-    bert_layers = subnetwork.vit.encoder.layer
+    vit_layers = subnetwork.vit.encoder.layer
 
-    for i, (layer, key) in enumerate(zip(bert_layers, arc_config)):
+    for i, (layer, key) in enumerate(zip(vit_layers, arc_config)):
         arc = arc_config[key]
         new_config = ViTConfig.from_dict(model.config.to_dict())
         # new_config.hidden_size = arc  # Set to the new output dimension

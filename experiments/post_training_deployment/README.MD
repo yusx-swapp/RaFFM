@@ -4,7 +4,7 @@
 
 In this experiment we show:
 
-**Post federated training, FMs trained by RaFFM is scalable, and we can generate surprisingly large number of scaled FMs (> $10^{10}$) with out further training**
+**Post federated training, FMs trained by RaFFM is scalable, and we can generate surprisingly large number of scaled FMs (> $10^{10}$) without further training**
 
 Most importantly, such scaled FMs are **high-performance**, which can fit different resource-constraints at the edge.
 
@@ -27,9 +27,9 @@ pip install -r requirements.txt
 
 We provide resource-aware FMs checkpoints trained via FL. You can download here:
 
-- [ViT-base CIFAR-100 _large-budget_](https://iowastate-my.sharepoint.com/:f:/g/personal/yusx_iastate_edu/El-nYhaOiINOoLHXsqqXqAkBOUEc_ohu-gGK0ms8neEFDQ) [Trained on *Large-budget* system heterogeneity edge-FL with 100 clients]
-- [ViT-base CIFAR-10 _large-budget_](https://iowastate-my.sharepoint.com/:f:/g/personal/yusx_iastate_edu/EkAE4V6VyO1JnpN9j-0QznUBjtREcIVttgVL9sjeP7mfvA) [Trained on *Large-budget* system heterogeneity edge-FL with 100 clients]
-- [ViT-base CIFAR-10 _small-budget_](https://iowastate-my.sharepoint.com/:u:/g/personal/yusx_iastate_edu/EYVquHHGqFBLlwZpSrfVTUYBJDcOCvD3Cw2AWk3BdseWjQ) [Trained on *Small-budget* system heterogeneity edge-FL with 100 clients]
+- [ViT-base CIFAR-100 _large-budget_](https://drive.google.com/drive/folders/1SnmA-K0etMGK8hLZVXJC0HNQbPbkPd0c?usp=sharing) [Trained on *Large-budget* system heterogeneity edge-FL with 100 clients]
+- [ViT-base CIFAR-10 _large-budget_](https://drive.google.com/drive/folders/1gd_RHZYX-YSYk56dO2oo8wqqSIUD41vb?usp=sharing) [Trained on *Large-budget* system heterogeneity edge-FL with 100 clients]
+- [ViT-base CIFAR-10 _small-budget_](https://drive.google.com/drive/folders/1_vOgDe8nj5NZ3fyBC3AaRfRsUGDbUAbH?usp=sharing) [Trained on *Small-budget* system heterogeneity edge-FL with 100 clients]
 
 ### Run the Experiments
 

@@ -2,242 +2,323 @@ import os
 import time
 import torch
 import numpy as np
-from datasets import load_dataset
-import functools
-import evaluate
-from torch.utils.tensorboard import SummaryWriter
-import copy
-from transformers import (
-    ViTForImageClassification,
-    ViTImageProcessor,
-    TrainingArguments,
-    Trainer,
-)
 from arguments import arguments
+from utils import DatasetSplitter, step_lr, EarlyStopping, calculate_params, aggregate
+from PriSM import (
+    VisionTransformer_Orth,
+    VisionTransformer,
+    convert_to_orth_model,
+    deit_tiny_patch16_224,
+    add_frob_decay,
+)
 
-import timm
-from PriSM import VisionTransformer_Orth
+import os
+import time
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import numpy as np
+from torch.utils.data import DataLoader, random_split, Dataset
+from torchvision import datasets, transforms, models
+from torch.optim.lr_scheduler import ExponentialLR
+from torch.utils.data import Subset
+
+# import timm
+import copy
+import argparse
+from sklearn.metrics import f1_score
+from transformers import ViTForImageClassification
+from utils import (
+    step_lr,
+    EarlyStopping,
+)
+import random
 
 
-# @staticmethod
-def compute_metrics(eval_pred):
-    accuracy_metric = evaluate.load("accuracy")
-    f1_metric = evaluate.load("f1")
+class DatasetSplitter:
+    def __init__(self, dataset, seed=None):
+        self.dataset = dataset
+        if seed is not None:
+            random.seed(seed)
 
-    accuracy = accuracy_metric.compute(
-        predictions=np.argmax(eval_pred.predictions, axis=1),
-        references=eval_pred.label_ids,
-    )
-    f1 = f1_metric.compute(
-        predictions=np.argmax(eval_pred.predictions, axis=1),
-        references=eval_pred.label_ids,
-        average="weighted",
-    )
+    def split(self, n, replacement=False):
+        if replacement:
+            return self._split_with_replacement(n)
+        else:
+            return self._split_without_replacement(n)
 
-    return {"accuracy": accuracy["accuracy"], "f1": f1["f1"]}
+    def _split_with_replacement(self, n):
+        size = len(self.dataset) // n
+        sub_datasets = []
+        for _ in range(n):
+            indices = random.choices(range(len(self.dataset)), k=size)
+            sub_dataset = Subset(self.dataset, indices)
+            sub_datasets.append(sub_dataset)
+        return sub_datasets
+
+    def _split_without_replacement(self, n):
+        indices = list(range(len(self.dataset)))
+        random.shuffle(indices)
+        size = len(indices) // n
+        sub_datasets = [indices[i * size : (i + 1) * size] for i in range(n)]
+        sub_datasets[-1].extend(indices[n * size :])
+
+        client_datasets = [Subset(self.dataset, indices) for indices in sub_datasets]
+
+        return client_datasets
+
+
+def eval(model, val_dataloader, device):
+    model.to(device)
+    model.eval()
+
+    correct_val = 0
+    all_preds, all_labels = [], []
+
+    for inputs, labels in val_dataloader:
+        inputs, labels = inputs.to(device), labels.to(device)
+
+        with torch.no_grad():
+            outputs = model(inputs).logits
+            preds = outputs.argmax(-1)
+            correct_val += torch.sum(preds == labels.data)
+            all_preds.extend(preds.cpu().numpy())
+            all_labels.extend(labels.cpu().numpy())
+
+    val_accuracy = correct_val.double() / len(val_dataloader.dataset)
+    val_f1_score = f1_score(all_labels, all_preds, average="weighted")
+    return val_accuracy, val_f1_score
+
+
+# class Subset(Dataset):
+#     def __init__(self, dataset, indices):
+#         self.dataset = dataset
+#         self.indices = indices
+
+#     def __getitem__(self, idx):
+#         image, label = self.dataset[self.indices[idx]]
+#         return image, label
+
+#     def __len__(self):
+#         return len(self.indices)
+
+
+def get_k_shot_indices(dataset, k, num_classes, num_clients, replace=False):
+    class_examples = [[] for _ in range(num_classes)]
+
+    for idx, (_, label) in enumerate(dataset):
+        class_examples[label].append(idx)
+
+    client_indices = []
+    for _ in range(num_clients):
+        indices = []
+        for class_idx in range(num_classes):
+            indices += np.random.choice(
+                class_examples[class_idx], k, replace=replace
+            ).tolist()
+        client_indices.append(indices)
+
+    return client_indices
+
+
+def set_parameter_requires_grad(model, feature_extracting, model_name):
+    if feature_extracting:
+        for param in model.parameters():
+            param.requires_grad = False
+
+        if model_name == "resnet":
+            for param in model.fc.parameters():
+                param.requires_grad = True
+        elif model_name == "vit":
+            for param in model.head.parameters():
+                param.requires_grad = True
+
+
+def initialize_model(model_name, num_classes, feature_extract, use_pretrained=True):
+    if model_name == "resnet":
+        model_ft = models.resnet50(pretrained=use_pretrained)
+        num_ftrs = model_ft.fc.in_features
+        model_ft.fc = nn.Linear(num_ftrs, num_classes)
+        # set_parameter_requires_grad(model_ft, feature_extract, model_name)
+
+    elif model_name == "vit":
+        # model_ft = timm.create_model("vit_base_patch16_224", pretrained=use_pretrained, num_classes=num_classes)
+        # model_ft = ViTForImageClassification.from_pretrained(
+        #     "google/vit-base-patch16-224",
+        #     num_labels=num_classes,
+        #     ignore_mismatched_sizes=True,
+        # )
+        model = deit_tiny_patch16_224(
+            "deit_tiny", pretrained=True, img_size=32, num_classes=10, patch_size=4
+        )
+        # Then convert to baseline PriSM
+        blocks_orth = convert_to_orth_model(
+            model.blocks, keep=0.8, fl=True
+        )  # keep: channel keep ratio; fl: whether create model for fl or centralized training
+        prism_model = VisionTransformer_Orth(model, blocks_orth)
+
+        # set_parameter_requires_grad(model_ft, feature_extract, model_name)
+    elif model_name == "vit-large":
+        model_ft = ViTForImageClassification.from_pretrained(
+            "google/vit-large-patch16-224-in21k",
+            num_labels=num_classes,
+            ignore_mismatched_sizes=True,
+        )
+        # model_ft = timm.create_model("vit_large_patch16_224", pretrained=use_pretrained, num_classes=num_classes)
+
+        # set_parameter_requires_grad(model_ft, feature_extract, model_name)
+
+    return model_ft
+
+
+def load_data(dataset_name, k_shot, transform, num_clients):
+    if dataset_name == "cifar100":
+        train_dataset = datasets.CIFAR100(
+            root="./data", train=True, download=True, transform=transform
+        )
+        val_dataset = datasets.CIFAR100(
+            root="./data", train=False, download=True, transform=transform
+        )
+        num_classes = 100
+
+    elif dataset_name == "cifar10":
+        train_dataset = datasets.CIFAR10(
+            root="./data", train=True, download=True, transform=transform
+        )
+        val_dataset = datasets.CIFAR10(
+            root="./data", train=False, download=True, transform=transform
+        )
+        num_classes = 10
+
+    elif dataset_name == "flowers102":
+        train_dataset = datasets.Flowers102(
+            root="./data", split="train", download=True, transform=transform
+        )
+        num_classes = 102
+        val_dataset = datasets.Flowers102(
+            root="./data", split="test", download=True, transform=transform
+        )
+
+    elif dataset_name == "Caltech101":
+        transform = transforms.Compose(
+            [
+                transforms.Resize((224, 224)),
+                transforms.Grayscale(num_output_channels=1),
+                transforms.ToTensor(),
+                transforms.Normalize((0.5), (0.5)),
+            ]
+        )
+
+        dataset = datasets.Caltech101(root="./data", download=True, transform=transform)
+
+        train_dataset, val_dataset = random_split(
+            dataset, [int(0.8 * len(dataset)), len(dataset) - int(0.8 * len(dataset))]
+        )
+        num_classes = 101
+
+    elif dataset_name == "Food101":
+        train_dataset = datasets.Food101(
+            root="./data", split="train", download=True, transform=transform
+        )
+        num_classes = 101
+        val_dataset = datasets.Food101(
+            root="./data", split="test", download=True, transform=transform
+        )
+
+    # replace = False
+    # if dataset_name == "flowers102":
+    #     replace = True
+
+    # indices = get_k_shot_indices(
+    #     train_dataset, k_shot, num_classes, num_clients, replace=replace
+    # )
+    # client_datasets = [Subset(train_dataset, indices) for indices in indices]
+
+    return train_dataset, val_dataset, num_classes
 
 
 def federated_learning(
-    args, global_model: RaFFM, local_datasets, val_dataset, test_dataset=None
+    args, model, local_dataloaders, val_dataloader, criterion, device="cuda"
 ):
     early_stopping = EarlyStopping(patience=5, verbose=True)
 
-    writer = SummaryWriter(os.path.join(args.save_dir, args.dataset))
+    global_model = model
     best_acc = 0.0
     best_f1 = 0.0
-
     for round in range(args.num_rounds):
         local_models = []
-        lr = step_lr(args.lr, round, args.step_size, 0.98)
+        lr = step_lr(args.lr, round, 5, 0.98)
 
         np.random.seed(int(time.time()))  # Set the seed to the current time
-
         client_indices = np.random.choice(
-            len(local_datasets),
-            size=int(0.1 * len(local_datasets)),
+            len(local_dataloaders),
+            size=int(0.1 * len(local_dataloaders)),
             replace=False,
         )
+        # if args.spp:
+        #     global_model.salient_parameter_prioritization()
 
-        if args.spp:
-            global_model.salient_parameter_prioritization()
         avg_trainable_params = 0
-        processor = ViTImageProcessor.from_pretrained("google/vit-base-patch16-224")
+
         # Train the model on each client's dataset
         # for local_dataloader in local_dataloaders:
         for idx, client_id in enumerate(client_indices):
-            local_dataset = local_datasets[client_id]
+            local_dataloader = local_dataloaders[client_id]
             print(f"Training client {client_id} in communication round {round}")
 
-            if args.method == "raffm":
-                if idx == 0:
-                    local_model = copy.deepcopy(global_model.model)
-                    local_model_params = global_model.total_params
-                elif idx == 1:
-                    (
-                        local_model,
-                        local_model_params,
-                        arc_config,
-                    ) = global_model.sample_smallest_model()
-                else:
-                    (
-                        local_model,
-                        local_model_params,
-                        arc_config,
-                    ) = global_model.random_resource_aware_model()
-            elif args.method == "vanilla":
-                local_model = copy.deepcopy(global_model.model)
-                local_model_params = global_model.total_params
+            local_model = copy.deepcopy(global_model)
+            local_model_params = calculate_params(local_model)
 
             avg_trainable_params += local_model_params
 
             print(
-                f"Client {client_id} local model has {local_model_params} parameters out of {global_model.total_params} parameters in communication round {round}"
-            )
-            writer.add_scalar(
-                str(client_id) + "/params",
-                local_model_params,
-                round,
-            )
-            training_args = TrainingArguments(
-                output_dir=os.path.join(args.save_dir, "clients", str(client_id)),
-                per_device_train_batch_size=args.batch_size,
-                per_device_eval_batch_size=args.batch_size,
-                evaluation_strategy="no",
-                save_strategy="no",
-                num_train_epochs=args.num_local_epochs,
-                # save_steps=100,
-                # eval_steps=100,
-                # logging_steps=10,
-                learning_rate=lr,
-                # save_total_limit=2,
-                remove_unused_columns=False,
-                push_to_hub=False,
-                report_to="none",
-                label_names=["labels"],
-                # load_best_model_at_end=True,
+                f"Client {client_id} local model has {local_model_params} parameters in communication round {round}"
             )
 
-            trainer = Trainer(
-                model=local_model,
-                args=training_args,
-                data_collator=collate_fn,
-                compute_metrics=compute_metrics,
-                train_dataset=local_dataset,
-                eval_dataset=val_dataset,
-                tokenizer=processor,
-            )
-            train_results = trainer.train()
+            local_model = local_model.to(device)
+            # local_model = nn.DataParallel(local_model)
+            local_optimizer = optim.Adam(local_model.parameters(), lr=lr)
+            lr_scheduler = ExponentialLR(local_optimizer, gamma=0.95)
+            # Fine-tune the local model on the client's dataset
+            for epoch in range(args.num_local_epochs):
+                local_model.train()
+                for inputs, labels in local_dataloader:
+                    inputs, labels = inputs.to(device), labels.to(device)
+                    local_optimizer.zero_grad()
+                    loss = local_model(inputs, labels=labels).loss
+                    loss.backward()
+                    # add Frobenius decay after gradient is calculated
+                    add_frob_decay(model, alpha=0.0002)
+                    local_optimizer.step()
 
-            if round > 95:
-                print(f"Eval local model {client_id}\n")
-                metrics = trainer.evaluate(val_dataset)
+                lr_scheduler.step()
 
-                trainer.log_metrics("eval", metrics)
-                val_accuracy, val_f1_score = (
-                    metrics["eval_accuracy"],
-                    metrics["eval_f1"],
-                )
-                writer.add_scalar(
-                    str(client_id) + "/eval_accuracy",
-                    val_accuracy,
-                    round,
-                )
-                writer.add_scalar(
-                    str(client_id) + "/eval_f1",
-                    val_f1_score,
-                    round,
-                )
+            print("Eval local model\n")
+            val_accuracy, val_f1_score = eval(local_model, val_dataloader, device)
+            print(f"Local Validation Accuracy: {val_accuracy:.4f}")
+            print(f"Local Validation F1 Score: {val_f1_score:.4f}")
 
             local_model.to("cpu")
             local_models.append(local_model)
-            print("Local training finished!")
+            print("Training finished!")
+        print("Eval global model finished!")
+        aggregate(global_model, local_models)
+        val_accuracy, val_f1_score = eval(global_model, val_dataloader, device)
 
-        avg_trainable_params = avg_trainable_params / len(client_indices)
-        writer.add_scalar(
-            "global/params",
-            avg_trainable_params,
-            round,
-        )
-        print(
-            f"Communication round {round} federated learning finished. \n Average trainable parameters:{avg_trainable_params}.\n Eval global model."
-        )
-        global_model.aggregate(local_models)
-
-        training_args = TrainingArguments(
-            output_dir=os.path.join(args.save_dir, "global"),
-            per_device_train_batch_size=args.batch_size,
-            per_device_eval_batch_size=args.batch_size,
-            evaluation_strategy="no",
-            save_strategy="no",
-            num_train_epochs=args.num_local_epochs,
-            # save_steps=100,
-            # eval_steps=100,
-            # logging_steps=10,
-            learning_rate=lr,
-            # save_total_limit=2,
-            remove_unused_columns=False,
-            push_to_hub=False,
-            report_to="none",
-            label_names=["labels"],
-            # load_best_model_at_end=True,
-        )
-
-        trainer = Trainer(
-            model=global_model.model,
-            args=training_args,
-            data_collator=collate_fn,
-            compute_metrics=compute_metrics,
-            train_dataset=local_dataset,
-            eval_dataset=val_dataset,
-            tokenizer=processor,
-        )
-        metrics = trainer.evaluate(val_dataset)
-        trainer.log_metrics("eval", metrics)
-        trainer.save_metrics("eval", metrics)
-        val_accuracy, val_f1_score = metrics["eval_accuracy"], metrics["eval_f1"]
-
-        writer.add_scalar(
-            "global/eval_accuracy",
-            val_accuracy,
-            round,
-        )
-        writer.add_scalar(
-            "global/eval_f1",
-            val_f1_score,
-            round,
-        )
-
-        global_model.model.to("cpu")
+        global_model.to("cpu")
         if val_accuracy > best_acc:
             best_acc = val_accuracy
-            global_model.model.save_pretrained(
-                os.path.join(args.save_dir, args.dataset, "best_model")
-            )
-
-            global_model.save_ckpt(
+            global_model.save_pretrained(
                 os.path.join(args.save_dir, args.dataset, "best_model")
             )
         if val_f1_score > best_f1:
             best_f1 = val_f1_score
-        writer.add_scalar(
-            "global/best_accuracy",
-            best_acc,
-            round,
-        )
-        writer.add_scalar(
-            "global/best_f1",
-            best_f1,
-            round,
-        )
+
+        print(f"Validation Accuracy: {val_accuracy:.4f}")
+        print(f"Validation F1 Score: {val_f1_score:.4f}")
 
         print(f"Best Validation Accuracy: {best_acc:.4f}")
         print(f"Best Validation F1 Score: {best_f1:.4f}")
-
-        if test_dataset:
-            metrics = trainer.evaluate(test_dataset, metric_key_prefix="test")
-            trainer.log_metrics("eval", metrics)
-            trainer.save_metrics("eval", metrics)
-
         early_stopping(val_f1_score)
         if early_stopping.has_converged():
             print("Model has converged. Stopping training.")
@@ -245,97 +326,131 @@ def federated_learning(
     return global_model
 
 
-def collate_fn(batch):
-    return {
-        "pixel_values": torch.stack([x["pixel_values"] for x in batch]),
-        "labels": torch.tensor([x["labels"] for x in batch]),
-    }
-
-
-def transform(example_batch, processor):
-    # Take a list of PIL images and turn them to pixel values
-    inputs = processor([x for x in example_batch["img"]], return_tensors="pt")
-
-    # Don't forget to include the labels!
-    inputs["labels"] = example_batch["label"]
-    return inputs
-
-
 def main(args):
-    if args.model == "vit":
-        model_name = "google/vit-base-patch16-224-in21k"
-    elif args.model == "vit-large":
-        model_name = "google/vit-large-patch16-224-in21k"
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # load data and preprocess
-    dataset = load_dataset(args.dataset)
-    if args.dataset == "cifar100":
-        dataset = dataset.rename_column("fine_label", "label")
-
-    train_val = dataset["train"].train_test_split(
-        test_size=0.2, stratify_by_column="label"
-    )
-    dataset["train"] = train_val["train"]
-    dataset["validation"] = train_val["test"]
-    labels = dataset["train"].features["label"].names
-
-    processor = ViTImageProcessor.from_pretrained(model_name)
-    prepared_ds = dataset.with_transform(
-        functools.partial(transform, processor=processor)
+    # transform = transforms.Compose([transforms.Resize((224, 224)), transforms.ToTensor()])
+    # define imagenet transforms
+    transform = transforms.Compose(
+        [
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+            transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+        ]
     )
 
-    splitter = DatasetSplitter(dataset["train"], seed=123)
+    if args.method == "centralized":
+        args.num_clients = 1
 
-    local_datasets = splitter.split(
-        args.num_clients, k_shot=args.k_shot, replacement=False
+    train_dataset, val_dataset, num_classes = load_data(
+        args.dataset, args.k_shot, transform, args.num_clients
     )
+    splitter = DatasetSplitter(train_dataset, seed=123)
 
-    for i, local_data in enumerate(local_datasets):
-        local_datasets[i] = local_data.with_transform(
-            functools.partial(transform, processor=processor)
-        )
+    local_datasets = splitter.split(args.num_clients, replacement=False)
 
-    # load/initialize global model and convert to raffm model
-    if args.resume_ckpt:
-        ckpt_path = args.resume_ckpt
-        elastic_config = (
-            os.path.join(ckpt_path, "elastic_space.json")
-            if os.path.exists(os.path.join(ckpt_path, "elastic_space.json"))
-            else args.elastic_config
-        )
+    train_dataloaders = [
+        DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
+        for train_dataset in local_datasets
+    ]
+    val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
 
-    else:
-        ckpt_path = model_name
-        elastic_config = args.elastic_config
+    # Load the pretrained ResNet-50 model
+    model = initialize_model(args.model, num_classes, True, use_pretrained=True)
+    model = model.to(device)
+    if args.ckpt:
+        model.from_pretrained(args.ckpt)
+    # model = nn.DataParallel(model)
 
-    model = ViTForImageClassification.from_pretrained(
-        ckpt_path,
-        num_labels=len(labels),
-        id2label={str(i): c for i, c in enumerate(labels)},
-        label2id={c: str(i) for i, c in enumerate(labels)},
-        ignore_mismatched_sizes=True,
-    )
-    # if args.peft:
-    #     config = LoraConfig(
-    #         r=16,
-    #         lora_alpha=16,
-    #         target_modules=["query", "key", "value"],
-    #         lora_dropout=0.1,
-    #         bias="none",
-    #         modules_to_save=["classifier"],
-    #     )
-    #     print(f"[Warning]: default PEFT method LoRA, default configure:", config)
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters(), lr=5e-5)
 
-    #     model = get_peft_model(model, config)
-    #     model.print_trainable_parameters()
-
-    global_model = RaFFM(model.to("cpu"), elastic_config)
     global_model = federated_learning(
-        args, global_model, local_datasets, prepared_ds["validation"]
+        args, model, train_dataloaders, val_dataloader, criterion, device="cuda"
     )
-    global_model.save_ckpt(os.path.join(args.save_dir, args.dataset, "final"))
+    global_model.save_pretrained(os.path.join(args.save_dir, args.dataset, "final"))
 
 
 if __name__ == "__main__":
-    args = arguments()
+    parser = argparse.ArgumentParser(
+        description="Few-shot learning with pre-trained models"
+    )
+    parser.add_argument(
+        "--method",
+        type=str,
+        default="raffm",
+        choices=["vanilla", "raffm"],
+        help="Method to use (centralized or federated)",
+    )
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="vit",
+        choices=["resnet", "vit", "vit-large"],
+        help="Model architecture to use (resnet or vit)",
+    )
+    parser.add_argument(
+        "--save_dir",
+        type=str,
+        default="log_vit",
+        help="dir save the model",
+    )
+
+    parser.add_argument(
+        "--ckpt",
+        type=str,
+        default=None,
+        help="dir save the model",
+    )
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        default="cifar100",
+        choices=["cifar100", "flowers102", "Caltech101", "cifar10", "Food101"],
+        help="Dataset to use (currently only cifar100 is supported)",
+    )
+    parser.add_argument(
+        "--k_shot",
+        type=int,
+        default=50,
+        help="Number of samples per class for few-shot learning",
+    )
+    parser.add_argument(
+        "--num_epochs", type=int, default=10, help="Number of training epochs"
+    )
+    parser.add_argument(
+        "--num_clients",
+        type=int,
+        default=100,
+        help="Number of clients in a federated learning setting",
+    )
+    parser.add_argument(
+        "--lr", type=float, default=5e-5, help="Learning rate for the optimizer"
+    )
+    parser.add_argument(
+        "--step_size",
+        type=int,
+        default=10,
+        help="Step size for the learning rate scheduler",
+    )
+    parser.add_argument(
+        "--num_local_epochs",
+        type=int,
+        default=5,
+        help="Number of local epochs for each client in a federated learning setting",
+    )
+    parser.add_argument(
+        "--num_rounds",
+        type=int,
+        default=100,
+        help="Number of communication rounds for federated learning",
+    )
+    parser.add_argument(
+        "--spp", action="store_true", help="salient parameter prioritization"
+    )
+    parser.add_argument(
+        "--batch_size", type=int, help="per device batch size", default=64
+    )
+
+    args = parser.parse_args()
     main(args)
