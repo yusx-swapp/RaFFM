@@ -40,7 +40,7 @@ def compute_metrics(eval_pred):
 def federated_learning(
     args, global_model: RaFFM, local_datasets, val_dataset, test_dataset=None
 ):
-    early_stopping = EarlyStopping(patience=5, verbose=True)
+    early_stopping = EarlyStopping(patience=500, verbose=True)
 
     writer = SummaryWriter(os.path.join(args.save_dir, args.dataset))
     best_acc = 0.0
@@ -54,7 +54,7 @@ def federated_learning(
 
         client_indices = np.random.choice(
             len(local_datasets),
-            size=int(0.1 * len(local_datasets)),
+            size=int(args.participation * len(local_datasets)),
             replace=False,
         )
 
