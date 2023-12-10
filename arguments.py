@@ -16,7 +16,7 @@ def arguments():
         "--model",
         type=str,
         default="vit",
-        choices=["resnet", "vit", "vit-large"],
+        choices=["resnet", "vit", "vit-large", "distilbert"],
         help="Model architecture to use (resnet or vit)",
     )
     parser.add_argument(
@@ -36,7 +36,7 @@ def arguments():
         "--dataset",
         type=str,
         default="cifar100",
-        choices=["cifar100", "flowers102", "Caltech101", "cifar10", "Food101"],
+        choices=["cifar100", "flowers102", "Caltech101", "cifar10", "Food101", "sst2"],
         help="Dataset to use (currently only cifar100 is supported)",
     )
     parser.add_argument(
@@ -53,7 +53,7 @@ def arguments():
     )
     parser.add_argument(
         "--participation",
-        type=int,
+        type=float,
         default=0.1,
         help="participation rate each round",
     )
