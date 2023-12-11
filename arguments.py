@@ -16,7 +16,7 @@ def arguments():
         "--model",
         type=str,
         default="vit",
-        choices=["resnet", "vit", "vit-large", "distilbert", "bert-base"],
+        choices=["resnet", "vit", "vit-large", "distilbert", "bert-base", "bert-large"],
         help="Model architecture to use (resnet or vit)",
     )
     parser.add_argument(
