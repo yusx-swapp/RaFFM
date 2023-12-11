@@ -15,8 +15,6 @@ from .param_prioritization import *
 from .utils import calculate_params, save_dict_to_file, load_dict_from_file
 from peft import PeftConfig, PeftModel
 
-# __all__ = ["salient_submodel_extraction"]
-
 
 class RaFFM:
     def __init__(self, model, elastic_config=None) -> None:
