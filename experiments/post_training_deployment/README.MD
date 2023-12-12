@@ -30,6 +30,7 @@ We provide resource-aware FMs checkpoints trained via FL. You can download here:
 - [ViT-base CIFAR-100 _large-budget_](https://drive.google.com/drive/folders/1SnmA-K0etMGK8hLZVXJC0HNQbPbkPd0c?usp=sharing) [Trained on *Large-budget* system heterogeneity edge-FL with 100 clients]
 - [ViT-base CIFAR-10 _large-budget_](https://drive.google.com/drive/folders/1gd_RHZYX-YSYk56dO2oo8wqqSIUD41vb?usp=sharing) [Trained on *Large-budget* system heterogeneity edge-FL with 100 clients]
 - [ViT-base CIFAR-10 _small-budget_](https://drive.google.com/drive/folders/1_vOgDe8nj5NZ3fyBC3AaRfRsUGDbUAbH?usp=sharing) [Trained on *Small-budget* system heterogeneity edge-FL with 100 clients]
+- [BERT-base SST-2 _small-budget_](https://drive.google.com/drive/folders/18F3oywR5licIdhQ4HhR-ev4Hrs9FwtlV?usp=sharing) [Trained on *Small-budget* system heterogeneity edge-FL with 100 clients]
 
 ### Run the Experiments
 

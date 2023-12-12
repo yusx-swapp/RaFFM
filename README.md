@@ -7,8 +7,6 @@ _Bridging the Gap Between Foundation Models and Heterogeneous Federated Learning
 ## Updates
 
 - [x] [10/30/2023] Scalable ViT Checkpoints released for heterogeneous resource edge-clients
-- [x] [10/30/2023] Demo scripts for train ViT on CIFAR-10/100 via heterogeneous resource FL
-- [x] [10/31/2023] Pushed elastic space APIs for system-heteo
 - [x] [11/02/2023] ViT-base CIFAR-100 checkpoints released, trained on _large-budget_ edge-FL settings with 100 clients.
 - [x] [11/05/2023] Resource-aware FMs with adapter published in branch **_adapter_**
 - [x] [11/07/2023] High-level API for real edge-FL
@@ -17,7 +15,7 @@ _Bridging the Gap Between Foundation Models and Heterogeneous Federated Learning
 - [x] [11/12/2023] Scripts for GLUE benchmark
 - [x] [11/16/2023] Experiments - Effectiveness of Salient Parameter Prioritization
 - [x] [12/04/2023] :boom: APIs for Segment Anything (SAM) released
-
+- [x] [12/10/2023] Scalable FM checkpoints and demo for [BERT on SST-2](./experiments/post_training_deployment/BERT_post_training_deployment.ipynb)
 ## Installation
 
 First, create a conda environment, then install pytorch.
@@ -46,6 +44,8 @@ We provide resource-aware FMs checkpoints trained via FL. You can download here:
 - [ViT-base CIFAR-100 _large-budget_](https://drive.google.com/drive/folders/1SnmA-K0etMGK8hLZVXJC0HNQbPbkPd0c?usp=sharing) [Trained on *Large-budget* system heterogeneity edge-FL with 100 clients]
 - [ViT-base CIFAR-10 _large-budget_](https://drive.google.com/drive/folders/1gd_RHZYX-YSYk56dO2oo8wqqSIUD41vb?usp=sharing) [Trained on *Large-budget* system heterogeneity edge-FL with 100 clients]
 - [ViT-base CIFAR-10 _small-budget_](https://drive.google.com/drive/folders/1_vOgDe8nj5NZ3fyBC3AaRfRsUGDbUAbH?usp=sharing) [Trained on *Small-budget* system heterogeneity edge-FL with 100 clients]
+
+- [BERT-base SST-2 _small-budget_](https://drive.google.com/drive/folders/18F3oywR5licIdhQ4HhR-ev4Hrs9FwtlV?usp=sharing) [Trained on *Small-budget* system heterogeneity edge-FL with 100 clients]
 
 ### Checkpoints Usage
 
