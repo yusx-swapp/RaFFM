@@ -1,6 +1,7 @@
 import numpy as np
 import copy
 from torch import nn
+import torch
 import time
 from .utils import calculate_params
 from peft import (
@@ -20,57 +21,102 @@ __all__ = [
 
 
 @staticmethod
-def load_subnet_state_dict(sub_model, org_model):
-    for (sub_name, sub_param), (org_name, org_param) in zip(
-        sub_model.named_parameters(), org_model.named_parameters()
-    ):
-        if len(sub_param.shape) == 2:
-            truncated_weight = org_param.data[
-                : sub_param.shape[0], : sub_param.shape[1]
-            ]
-        else:
-            truncated_weight = org_param.data[: sub_param.shape[0]]
-        sub_param.data.copy_(truncated_weight)
+def copy_weights_to_subnet(subnet, org_model):
+    """
+    Copies the weights from original foundation model to scaled subnet where the parameter names match.
+    Only the overlapping parts of the weights are copied when the dimensions in the subnet
+    are less than or equal to those in the larger model.
+
+    Parameters:
+    subnet (torch.nn.Module): The smaller model to which the weights will be copied.
+    org_model (torch.nn.Module): The foundation model from which the weights will be sourced.
+
+    Usage:
+    This function is useful in extract subnet from pre-trained foundation model scenarios where a smaller model is initialized
+    with weights from certain layers of a larger, pre-trained model.
+    """
+
+    for sm_param_name, sm_param in subnet.named_parameters():
+        if sm_param_name in dict(org_model.named_parameters()):
+            lg_param = dict(org_model.named_parameters())[sm_param_name]
+            if all(
+                sm_dim <= lg_dim
+                for sm_dim, lg_dim in zip(sm_param.shape, lg_param.shape)
+            ):
+                # Create a slice object for each dimension to copy the corresponding weights
+                slices = tuple(
+                    slice(0, min(sm_dim, lg_dim))
+                    for sm_dim, lg_dim in zip(sm_param.shape, lg_param.shape)
+                )
+                sm_param.data.copy_(lg_param.data[slices])
+
+
+@staticmethod
+def check_weight_copy_correctness(subnet, org_model):
+    """
+    Checks if the weights have been correctly copied from the larger model to the smaller model.
+
+    Parameters:
+    smaller_model (torch.nn.Module): The smaller model with copied weights.
+    larger_model (torch.nn.Module): The larger model from which the weights were sourced.
+
+    Returns:
+    bool: True if the weights are correctly copied, False otherwise.
+
+    Usage:
+    Useful for verifying the correctness of a weight copying process in model adaptation or transfer learning.
+    """
+
+    for sm_param_name, sm_param in subnet.named_parameters():
+        if sm_param_name in dict(org_model.named_parameters()):
+            lg_param = dict(org_model.named_parameters())[sm_param_name]
+
+            # Compare shapes
+            if not all(
+                sm_dim <= lg_dim
+                for sm_dim, lg_dim in zip(sm_param.shape, lg_param.shape)
+            ):
+                return False
+
+            # Compare values
+            slices = tuple(
+                slice(0, min(sm_dim, lg_dim))
+                for sm_dim, lg_dim in zip(sm_param.shape, lg_param.shape)
+            )
+            if not torch.all(sm_param == lg_param[slices]):
+                return False
+
+    return True
 
 
 @staticmethod
 def arc_config_sampler(
-    atten_out_space,
-    inter_hidden_space,
-    out_hidden_space,
+    atten_out_space: list[int],
+    inter_hidden_space: list[int],
+    residual_hidden_space: list[int],
     n_layer=12,
-    embedding_size=768,
-    model_out_hidden=768,
     smallest=False,
-):
-    """_summary_
+) -> dict:
+    """Generate subnet architecture configuration based on the provided configuration.
 
     Args:
-        atten_out_space (_type_): _description_
-        inter_hidden_space (_type_): _description_
-        out_hidden_space (_type_): _description_
-        n_layer (int, optional): _description_. Defaults to 12.
-        embedding_size (int, optional): _description_. Defaults to 768.
-        model_out_hidden (int, optional): _description_. Defaults to 768.
+        atten_out_space (list[int]): Attention head output hidden size space, NOT the hidden space.
+        inter_hidden_space (list[int]): Intermediate dense hidden layer size space.
+        residual_hidden_space (list[int]): Attention (input size) and Intermediate layer (out size) hidden size.
+        n_layer (int, optional): Number of multi-head attention layers. Defaults to 12.
+        smallest (bool, optional): Either return smallest subnet configuration. Defaults to False.
 
     Returns:
-        _type_: _description_
+        dic: Subnet architecture configure.
     """
     arc_config = {}
     np.random.seed(int(time.time()))  # Set the seed to the current time
+
+    residual_hidden = np.random.choice(residual_hidden_space)
+    if smallest:
+        residual_hidden = min(residual_hidden_space)
+
     for layer in range(n_layer):
-        if layer == 0:
-            pre_hidden = embedding_size
-        else:
-            pre_hidden = arc_config[f"layer_{layer}"]["out_hidden"]
-
-        if layer == n_layer - 1:
-            out_hidden = model_out_hidden
-        else:
-            out_hidden = np.random.choice(out_hidden_space)
-            if smallest:
-                out_hidden = min(out_hidden_space)
-
         if smallest:
             inter_hidden = min(inter_hidden_space)
             atten_out = min(atten_out_space)
@@ -81,9 +127,8 @@ def arc_config_sampler(
 
         arc_config[f"layer_{layer + 1}"] = {
             "atten_out": atten_out,
-            "pre_hidden": pre_hidden,
             "inter_hidden": inter_hidden,
-            "out_hidden": out_hidden,
+            "residual_hidden": residual_hidden,
         }
 
     return arc_config
@@ -96,12 +141,14 @@ def bert_module_handler(model, arc_config):
         BertSelfOutput,
         BertIntermediate,
         BertOutput,
+        BertEmbeddings,
+        BertPooler,
     )
     from transformers import BertConfig
 
     BertLayerNorm = nn.LayerNorm
 
-    class NewBertSelfAttention(BertSelfAttention):
+    class BertSelfAttention(BertSelfAttention):
         def __init__(self, config):
             super().__init__(config)
 
@@ -115,7 +162,7 @@ def bert_module_handler(model, arc_config):
 
             self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
 
-    class NewBertSelfOutput(BertSelfOutput):
+    class BertSelfOutput(BertSelfOutput):
         def __init__(self, config):
             super().__init__(config)
             self.dense = nn.Linear(
@@ -126,12 +173,12 @@ def bert_module_handler(model, arc_config):
                 config.hidden_size, eps=config.layer_norm_eps
             )
 
-    class NewBertIntermediate(BertIntermediate):
+    class BertIntermediate(BertIntermediate):
         def __init__(self, config):
             super().__init__(config)
             self.dense = nn.Linear(config.hidden_size, config.intermediate_size)
 
-    class NewBertOut(BertOutput):
+    class BertOutput(BertOutput):
         def __init__(self, config):
             super().__init__(config)
             self.dense = nn.Linear(config.intermediate_size, config.hidden_size)
@@ -143,28 +190,37 @@ def bert_module_handler(model, arc_config):
 
     bert_layers = subnetwork.bert.encoder.layer
 
+    new_config = BertConfig.from_dict(model.config.to_dict())
+
     for i, (layer, key) in enumerate(zip(bert_layers, arc_config)):
         arc = arc_config[key]
-        new_config = BertConfig.from_dict(model.config.to_dict())
         # new_config.hidden_size = arc  # Set to the new output dimension
         new_config.attention_head_size = (
             arc["atten_out"] // new_config.num_attention_heads
         )  # Ensure it divides evenly
         new_config.intermediate_size = arc["inter_hidden"]
-        new_attention_layer = NewBertSelfAttention(config=new_config)
-        new_out_layer = NewBertSelfOutput(config=new_config)
-        new_inter_layer = NewBertIntermediate(config=new_config)
-        new_dens_out_layer = NewBertOut(config=new_config)
+        new_config.hidden_size = arc["residual_hidden"]
 
-        load_subnet_state_dict(new_attention_layer, layer.attention.self)
-        load_subnet_state_dict(new_out_layer, layer.attention.output)
-        load_subnet_state_dict(new_inter_layer, layer.intermediate)
-        load_subnet_state_dict(new_dens_out_layer, layer.output)
+        new_attention_layer = BertSelfAttention(config=new_config)
+        new_out_layer = BertSelfOutput(config=new_config)
+        new_inter_layer = BertIntermediate(config=new_config)
+        new_dens_out_layer = BertOutput(config=new_config)
 
         layer.attention.self = new_attention_layer
         layer.attention.output = new_out_layer
         layer.intermediate = new_inter_layer
         layer.output = new_dens_out_layer
+
+    new_embeddings = BertEmbeddings(new_config)
+    new_pooler = BertPooler(new_config)
+    new_classifier = nn.Linear(new_config.hidden_size, model.classifier.out_features)
+
+    subnetwork.bert.embeddings = new_embeddings
+    subnetwork.bert.pooler = new_pooler
+    subnetwork.classifier = new_classifier
+
+    subnetwork.config = new_config
+    copy_weights_to_subnet(subnetwork, model)
 
     total_params = calculate_params(subnetwork)
 
@@ -178,10 +234,12 @@ def vit_module_handler(model, arc_config):
         ViTSelfOutput,
         ViTIntermediate,
         ViTOutput,
+        ViTEmbeddings,
     )
     from transformers import ViTConfig
+    from torch import nn
 
-    class NewViTSelfAttention(ViTSelfAttention):
+    class ViTSelfAttention(ViTSelfAttention):
         def __init__(self, config: ViTConfig):
             super().__init__(config)
 
@@ -201,7 +259,7 @@ def vit_module_handler(model, arc_config):
 
             self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
 
-    class NewViTSelfOutput(ViTSelfOutput):
+    class ViTSelfOutput(ViTSelfOutput):
         def __init__(self, config: ViTConfig):
             super().__init__(config)
             self.dense = nn.Linear(
@@ -210,12 +268,12 @@ def vit_module_handler(model, arc_config):
             )
             self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
-    class NewViTIntermediate(ViTIntermediate):
+    class ViTIntermediate(ViTIntermediate):
         def __init__(self, config: ViTConfig):
             super().__init__(config)
             self.dense = nn.Linear(config.hidden_size, config.intermediate_size)
 
-    class NewViTOutput(ViTOutput):
+    class ViTOutput(ViTOutput):
         def __init__(self, config):
             super().__init__(config)
             self.dense = nn.Linear(config.intermediate_size, config.hidden_size)
@@ -223,29 +281,45 @@ def vit_module_handler(model, arc_config):
     subnetwork = copy.deepcopy(model).cpu()
 
     vit_layers = subnetwork.vit.encoder.layer
+    new_config = ViTConfig.from_dict(model.config.to_dict())
 
     for i, (layer, key) in enumerate(zip(vit_layers, arc_config)):
         arc = arc_config[key]
-        new_config = ViTConfig.from_dict(model.config.to_dict())
         # new_config.hidden_size = arc  # Set to the new output dimension
         new_config.attention_head_size = (
             arc["atten_out"] // new_config.num_attention_heads
         )  # Ensure it divides evenly
         new_config.intermediate_size = arc["inter_hidden"]
-        new_attention_layer = NewViTSelfAttention(config=new_config)
-        new_out_layer = NewViTSelfOutput(config=new_config)
-        new_inter_layer = NewViTIntermediate(config=new_config)
-        new_dens_out_layer = NewViTOutput(config=new_config)
+        new_config.hidden_size = arc["residual_hidden"]
 
-        load_subnet_state_dict(new_attention_layer, layer.attention.attention)
-        load_subnet_state_dict(new_out_layer, layer.attention.output)
-        load_subnet_state_dict(new_inter_layer, layer.intermediate)
-        load_subnet_state_dict(new_dens_out_layer, layer.output)
+        new_attention_layer = ViTSelfAttention(config=new_config)
+        new_out_layer = ViTSelfOutput(config=new_config)
+        new_inter_layer = ViTIntermediate(config=new_config)
+        new_dens_out_layer = ViTOutput(config=new_config)
+        layernorm_before = nn.LayerNorm(
+            new_config.hidden_size, eps=new_config.layer_norm_eps
+        )
+        layernorm_after = nn.LayerNorm(
+            new_config.hidden_size, eps=new_config.layer_norm_eps
+        )
 
         layer.attention.attention = new_attention_layer
         layer.attention.output = new_out_layer
         layer.intermediate = new_inter_layer
         layer.output = new_dens_out_layer
+        layer.layernorm_before = layernorm_before
+        layer.layernorm_after = layernorm_after
+
+    new_embeddings = ViTEmbeddings(new_config)
+    new_layernorm = nn.LayerNorm(new_config.hidden_size, eps=new_config.layer_norm_eps)
+    new_classifier = nn.Linear(new_config.hidden_size, model.classifier.out_features)
+
+    subnetwork.vit.embeddings = new_embeddings
+    subnetwork.vit.layernorm = new_layernorm
+    subnetwork.classifier = new_classifier
+
+    subnetwork.config = new_config
+    copy_weights_to_subnet(subnetwork, model)
 
     total_params = calculate_params(subnetwork)
 
@@ -337,13 +411,11 @@ def sam_module_handler(model, arc_config):
 
         new_mlp = SamMLPBlock(config=new_config)
 
-        load_subnet_state_dict(new_attention_layer, layer.attn)
-        load_subnet_state_dict(new_mlp, layer.mlp)
-
         layer.attn = new_attention_layer
         layer.mlp = new_mlp
 
     sub_model.vision_encoder = vision_encoder
+    copy_weights_to_subnet(sub_model, model)
     total_params = calculate_params(sub_model)
 
     return sub_model, total_params
