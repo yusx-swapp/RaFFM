@@ -501,16 +501,12 @@ def vit_peft_module_handler(model: PeftModel, peft_config: PeftConfig, arc_confi
                 peft_config, new_dens_out_layer
             )
 
-        load_subnet_state_dict(new_attention_layer, layer.attention.attention)
-        load_subnet_state_dict(new_out_layer, layer.attention.output)
-        load_subnet_state_dict(new_inter_layer, layer.intermediate)
-        load_subnet_state_dict(new_dens_out_layer, layer.output)
-
         layer.attention.attention = new_attention_layer
         layer.attention.output = new_out_layer
         layer.intermediate = new_inter_layer
         layer.output = new_dens_out_layer
 
+    copy_weights_to_subnet(subnetwork, model)
     # total_params = calculate_params(subnetwork)
     trainable_params, all_param = subnetwork.get_nb_trainable_parameters()
 
