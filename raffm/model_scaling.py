@@ -515,18 +515,3 @@ def vit_peft_module_handler(model: PeftModel, peft_config: PeftConfig, arc_confi
     trainable_params, all_param = subnetwork.get_nb_trainable_parameters()
 
     return subnetwork, trainable_params
-
-
-def _test():
-    # print(model.config)
-    atten_out_space = [768 - i * 24 for i in range(0, 10)]
-    inter_hidden_space = [3072 - i * 128 for i in range(0, 25)]
-    out_hidden_space = [768 - i * 24 for i in range(0, 10)]
-    arc_config = arc_config_sampler(
-        atten_out_space, inter_hidden_space, out_hidden_space
-    )
-    # submodel,total_params,_,_ = bert_module_handler(
-    #     model, arc_config
-    # )
-
-    # print(submodel)
