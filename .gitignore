@@ -20,7 +20,7 @@ data/
 *logs/
 **.ini
 *.test/
-ckpt/
+ckpt*/
 /log
 .venv
 *test*
