@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 DESCRIPTION = "Resource-aware Federated Foundation Models (RaFFM): Bridging the Gap Between Foundation Models and Heterogeneous Federated Learning"
 
 with open("requirements.txt") as f:
