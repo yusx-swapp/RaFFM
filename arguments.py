@@ -22,7 +22,7 @@ def arguments():
     parser.add_argument(
         "--save_dir",
         type=str,
-        default="log_vit",
+        default="log",
         help="dir save the model",
     )
 
@@ -69,7 +69,7 @@ def arguments():
     parser.add_argument(
         "--num_local_epochs",
         type=int,
-        default=5,
+        default=1,
         help="Number of local epochs for each client in a federated learning setting",
     )
     parser.add_argument(
