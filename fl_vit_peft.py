@@ -46,6 +46,7 @@ def federated_learning(
     best_acc = 0.0
     best_f1 = 0.0
 
+    # TODO: SPP error
     if args.spp:
         global_model.salient_parameter_prioritization()
     for round in range(args.num_rounds):
@@ -311,6 +312,7 @@ def main(args):
             functools.partial(transform, processor=processor)
         )
 
+    # TODO update the logic of the below if blocks
     # load/initialize global model and convert to raffm model
     if args.resume_ckpt:
         ckpt_path = args.resume_ckpt
@@ -335,12 +337,13 @@ def main(args):
         if args.adapter_ckpt:
             model = PeftModel.from_pretrained(model, args.adapter_ckpt)
             elastic_config = (
-                os.path.join(args.adapter_ckpt, "elastic.pt")
-                if os.path.exists(os.path.join(args.adapter_ckpt, "elastic.pt"))
+                os.path.join(args.adapter_ckpt, "elastic_space.json")
+                if os.path.exists(os.path.join(args.adapter_ckpt, "elastic_space.json"))
                 else None
             )
             config = None
         else:
+            # TODO: add peft configuration path arguments
             config = LoraConfig(
                 r=16,
                 lora_alpha=16,
