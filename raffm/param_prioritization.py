@@ -296,7 +296,7 @@ def llama_spp_handler(model, metric):
                 module.k_proj.bias.data = module.k_proj.bias.data[perm]
 
 
-@staticmethod
+
 def salient_parameter_prioritization(org_model, metric=l1_norm):
     """
     Prioritize the saliant weights of the query and key matrices in all multi-head attention layers of BERT based on a given metric.

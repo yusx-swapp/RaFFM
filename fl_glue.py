@@ -29,7 +29,7 @@ from scipy.stats import pearsonr
 from sklearn.metrics import accuracy_score, matthews_corrcoef
 
 
-@staticmethod
+
 # set no_deprecation_warning to True to avoid warning messages
 def compute_metrics(eval_pred, task):
     predictions, labels = eval_pred

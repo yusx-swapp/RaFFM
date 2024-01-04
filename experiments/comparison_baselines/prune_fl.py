@@ -19,7 +19,7 @@ from PruneFL import prunefl
 from arguments import arguments
 
 
-# @staticmethod
+
 def compute_metrics(eval_pred):
     accuracy_metric = evaluate.load("accuracy")
     f1_metric = evaluate.load("f1")

@@ -20,7 +20,7 @@ __all__ = [
 ]
 
 
-@staticmethod
+
 def copy_weights_to_subnet(subnet, org_model):
     """
     Copies the weights from original foundation model to scaled subnet where the parameter names match.
@@ -51,7 +51,6 @@ def copy_weights_to_subnet(subnet, org_model):
                 sm_param.data.copy_(lg_param.data[slices])
 
 
-@staticmethod
 def check_weight_copy_correctness(subnet, org_model):
     """
     Checks if the weights have been correctly copied from the larger model to the smaller model.
@@ -89,7 +88,7 @@ def check_weight_copy_correctness(subnet, org_model):
     return True
 
 
-@staticmethod
+
 def arc_config_sampler(
     atten_out_space: list[int],
     inter_hidden_space: list[int],
@@ -134,7 +133,7 @@ def arc_config_sampler(
     return arc_config
 
 
-@staticmethod
+
 def bert_module_handler(model, arc_config):
     from transformers.models.bert.modeling_bert import (
         BertSelfAttention,
@@ -227,7 +226,7 @@ def bert_module_handler(model, arc_config):
     return subnetwork, total_params
 
 
-@staticmethod
+
 def vit_module_handler(model, arc_config):
     from transformers.models.vit.modeling_vit import (
         ViTSelfAttention,
@@ -326,7 +325,7 @@ def vit_module_handler(model, arc_config):
     return subnetwork, total_params
 
 
-@staticmethod
+
 def sam_module_handler(model, arc_config):
     from transformers.models.sam.modeling_sam import (
         SamVisionAttention,
@@ -421,7 +420,7 @@ def sam_module_handler(model, arc_config):
     return sub_model, total_params
 
 
-@staticmethod
+
 def vit_peft_module_handler(model: PeftModel, peft_config: PeftConfig, arc_config):
     from transformers.models.vit.modeling_vit import (
         ViTSelfAttention,

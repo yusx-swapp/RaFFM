@@ -26,7 +26,7 @@ def aggregate(global_model, local_models):
                         param[: local_param.shape[0]] += local_param / len(local_models)
 
 
-@staticmethod
+
 def save_dict_to_file(dictionary, file_path):
     """
     Saves a dictionary object to a file using JSON format.
@@ -40,7 +40,7 @@ def save_dict_to_file(dictionary, file_path):
         json.dump(dictionary, file)
 
 
-@staticmethod
+
 def load_dict_from_file(file_path):
     """
     Loads a dictionary object from a file which is in JSON format.
@@ -55,12 +55,12 @@ def load_dict_from_file(file_path):
     return dictionary
 
 
-@staticmethod
+
 def step_lr(initial_lr, epoch, decay_step, decay_rate):
     return initial_lr * (decay_rate ** (epoch // decay_step))
 
 
-@staticmethod
+
 def count_non_zero_params(model) -> int:
     """
     Count the number of non-zero parameters in a PyTorch model.
@@ -74,7 +74,6 @@ def count_non_zero_params(model) -> int:
     return sum((param != 0).sum().item() for param in model.parameters())
 
 
-@staticmethod
 def calculate_params(model):
     """calculate the number of parameters in the model
     Args:
