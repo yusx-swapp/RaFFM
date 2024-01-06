@@ -11,7 +11,7 @@ from .model_scaling import (
     vit_peft_module_handler,
     sam_module_handler,
 )
-from .param_prioritization import *
+from .param_prioritization import salient_parameter_prioritization, l1_norm
 from .utils import calculate_params, save_dict_to_file, load_dict_from_file
 from peft import PeftConfig, PeftModel
 
@@ -21,6 +21,9 @@ class RaFFM:
         self.model = model
         self.total_params = calculate_params(model=model)
 
+        if hasattr(self.model.config, "elastic_config"):
+            elastic_config = self.model.config.elastic_config
+        
         if not elastic_config:
             # set defalt search space configuration (this is defalt setting for bert)
             elastic_config = {
@@ -38,6 +41,7 @@ class RaFFM:
             elastic_config, dict
         ), "Invalid elastic_config, expect input a dictionary or file path"
 
+        self.model.config.elastic_config = elastic_config
         self.elastic_config = elastic_config
 
     def random_resource_aware_model(self):
@@ -52,17 +56,17 @@ class RaFFM:
 
         if "bert" == self.model.config.model_type.lower():
             arc_config = arc_config_sampler(
-                **self.elastic_config, n_layer=self.model.config.num_hidden_layers
+                **self.model.config.elastic_config, n_layer=self.model.config.num_hidden_layers
             )
             subnetwork, total_params = bert_module_handler(self.model, arc_config)
         elif "vit" == self.model.config.model_type.lower():
             arc_config = arc_config_sampler(
-                **self.elastic_config, n_layer=self.model.config.num_hidden_layers
+                **self.model.config.elastic_config, n_layer=self.model.config.num_hidden_layers
             )
             subnetwork, total_params = vit_module_handler(self.model, arc_config)
         elif "sam" == self.model.config.model_type.lower():
             arc_config = arc_config_sampler(
-                **self.elastic_config,
+                **self.model.config.elastic_config,
                 n_layer=self.model.vision_encoder.config.num_hidden_layers,
             )
             subnetwork, total_params = sam_module_handler(self.model, arc_config)
@@ -71,7 +75,7 @@ class RaFFM:
         return subnetwork, total_params, arc_config
 
     def sample_smallest_model(self):
-        arc_config = arc_config_sampler(**self.elastic_config, smallest=True)
+        arc_config = arc_config_sampler(**self.model.config.elastic_config, smallest=True)
         subnetwork, total_params = self.resource_aware_model(arc_config)
         return subnetwork, total_params, arc_config
 
@@ -109,15 +113,18 @@ class RaFFM:
 
     def save_ckpt(self, dir):
         self.model.save_pretrained(os.path.join(dir))
-        save_dict_to_file(self.elastic_config, os.path.join(dir, "elastic_space.json"))
+        # save_dict_to_file(self.elastic_config, os.path.join(dir, "elastic_space.json"))
 
     def load_ckpt(self, dir):
         self.model = self.model.from_pretrained(dir)
+        assert hasattr(
+            self.model.config, "elastic_config"
+        ), "No elastic configuration found in the model config file. Please check the config file."
 
-        if os.path.exists(os.path.join(dir, "elastic_space.json")):
-            self.elastic_config = load_dict_from_file(
-                os.path.join(dir, "elastic_space.json")
-            )
+        # if os.path.exists(os.path.join(dir, "elastic_space.json")):
+        #     self.elastic_config = load_dict_from_file(
+        #         os.path.join(dir, "elastic_space.json")
+        #     )
 
 
 class RaPEFT(RaFFM):
@@ -134,14 +141,14 @@ class RaPEFT(RaFFM):
             )
 
     def random_peft_model(self):
-        arc_config = arc_config_sampler(**self.elastic_config)
+        arc_config = arc_config_sampler(**self.model.config.elastic_config)
 
         subnetwork, trainable_params = self.resource_aware_peft_model(arc_config)
 
         return subnetwork, trainable_params, arc_config
 
     def smallest_peft_model(self):
-        arc_config = arc_config_sampler(**self.elastic_config, smallest=True)
+        arc_config = arc_config_sampler(**self.model.config.elastic_config, smallest=True)
         subnetwork, trainable_params = self.resource_aware_peft_model(arc_config)
         return subnetwork, trainable_params, arc_config
 
