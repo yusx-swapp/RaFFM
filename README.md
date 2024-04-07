@@ -1,4 +1,5 @@
 # Resource-aware Federated Foundation Models (RaFFM): Bridging the Gap Between Foundation Models and Heterogeneous Federated Learning
+[![DOI](https://zenodo.org/badge/711695617.svg)](https://zenodo.org/doi/10.5281/zenodo.10937593)
 
 This is the official implementation for the paper:
 
